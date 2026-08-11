@@ -21,6 +21,7 @@ from urllib.parse import urlsplit
 import yaml
 
 DEFAULT_TIMEOUT = 10
+DEFAULT_HEARTBEAT_MAX_AGE = 900  # seconds; 3x a 5-minute push interval
 RETENTION_DAYS_DEFAULT = 30
 BAR_SAMPLES_DEFAULT = 50
 INCIDENT_LIMIT_DEFAULT = 20
@@ -42,12 +43,14 @@ def load_config(path: str) -> list[dict]:
         if m["name"] in seen:
             raise ValueError(f"duplicate monitor name: {m['name']!r}")
         seen.add(m["name"])
-        if m["type"] not in ("http", "tcp"):
+        if m["type"] not in ("http", "tcp", "heartbeat"):
             raise ValueError(f"unsupported monitor type: {m['type']!r}")
         if m["type"] == "http" and "url" not in m:
             raise ValueError(f"http monitor {m['name']!r} missing 'url'")
         if m["type"] == "tcp" and ("host" not in m or "port" not in m):
             raise ValueError(f"tcp monitor {m['name']!r} missing 'host'/'port'")
+        if m["type"] == "heartbeat" and "slug" not in m:
+            raise ValueError(f"heartbeat monitor {m['name']!r} missing 'slug'")
     return monitors
 
 
@@ -110,22 +113,48 @@ def check_tcp(monitor: dict) -> dict:
         }
 
 
-def run_check(monitor: dict) -> dict:
+def check_heartbeat(monitor: dict, data_dir: str) -> dict:
+    """A "pull-less" check for machines GitHub Actions can't reach directly
+    (e.g. behind a VPN). The machine itself pushes a last-seen timestamp to
+    data/heartbeats/<slug>.json via the GitHub Contents API (see
+    scripts/heartbeat.py); we just judge whether that timestamp is fresh.
+    """
+    max_age = monitor.get("max_age", DEFAULT_HEARTBEAT_MAX_AGE)
+    path = os.path.join(data_dir, "heartbeats", f"{monitor['slug']}.json")
+    if not os.path.exists(path):
+        return {"status": "down", "latency_ms": None, "message": "no heartbeat received yet"}
+    try:
+        with open(path, "r") as f:
+            last_seen = datetime.fromisoformat(json.load(f)["last_seen"].replace("Z", "+00:00"))
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        return {"status": "down", "latency_ms": None, "message": f"invalid heartbeat file: {e}"}
+    age = (datetime.now(timezone.utc) - last_seen).total_seconds()
+    healthy = 0 <= age <= max_age
+    return {
+        "status": "up" if healthy else "down",
+        "latency_ms": None,
+        "message": f"last heartbeat {round(age)}s ago" if healthy else f"stale heartbeat ({round(age)}s ago, max {max_age}s)",
+    }
+
+
+def run_check(monitor: dict, data_dir: str) -> dict:
     if monitor["type"] == "http":
         result = check_http(monitor)
-    else:
+    elif monitor["type"] == "tcp":
         result = check_tcp(monitor)
+    else:
+        result = check_heartbeat(monitor, data_dir)
     result["name"] = monitor["name"]
     result["type"] = monitor["type"]
     return result
 
 
-def run_checks(monitors: list[dict], workers: int) -> list[dict]:
+def run_checks(monitors: list[dict], workers: int, data_dir: str) -> list[dict]:
     if not monitors:
         return []
     results = {}
     with ThreadPoolExecutor(max_workers=min(workers, len(monitors))) as pool:
-        futures = {pool.submit(run_check, m): m["name"] for m in monitors}
+        futures = {pool.submit(run_check, m, data_dir): m["name"] for m in monitors}
         for future in as_completed(futures):
             name = futures[future]
             results[name] = future.result()
@@ -269,7 +298,7 @@ def main() -> int:
     monitors = load_config(args.config)
     os.makedirs(args.data_dir, exist_ok=True)
 
-    results = run_checks(monitors, args.workers)
+    results = run_checks(monitors, args.workers, args.data_dir)
     now_ts = int(time.time())
 
     history_path = os.path.join(args.data_dir, "history.json")

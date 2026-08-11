@@ -52,10 +52,22 @@ jobs:
           git add data
           if git diff --cached --quiet; then
             echo "no changes to commit"
-          else
-            git commit -m "update status $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            git push origin data
+            exit 0
           fi
+          git commit -m "update status $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # Machines pushing heartbeats (scripts/heartbeat.py) can land commits
+          # on this branch between our fetch and our push, so retry with a
+          # rebase instead of failing on a non-fast-forward push.
+          for attempt in 1 2 3; do
+            if git push origin data; then
+              exit 0
+            fi
+            echo "push rejected, rebasing onto latest data (attempt $attempt)"
+            git fetch origin data
+            git rebase origin/data
+          done
+          echo "::error::failed to push updated history after retries"
+          exit 1
 
       - name: Assemble Pages site
         run: |

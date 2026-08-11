@@ -4,30 +4,51 @@
 #
 # Common fields:
 #   name    - display name (must be unique, used as the history key)
-#   type    - "http" or "tcp"
+#   type    - "http", "tcp", or "heartbeat"
 #   timeout - seconds to wait before treating the check as failed (default: 10)
 #
 # http fields:
-#   url             - full URL to request
-#   expected_status - optional, defaults to "2xx/3xx healthy"; set e.g. [200] to be strict
+#   url     - full URL to request (2xx/3xx = healthy, redirects not followed)
 #
 # tcp fields:
 #   host - hostname or IP
 #   port - TCP port number
+#
+# heartbeat fields (for machines GitHub Actions can't reach directly, e.g.
+# behind a VPN -- see README.md "VPN-only machines"):
+#   slug     - matches the slug passed to `scripts/heartbeat.py <slug>` on the machine
+#   max_age  - seconds since the last heartbeat before considered down (default: 900)
 
 monitors:
+  # Sites
   - name: ROARS Website
     type: http
     url: https://roars.dev
     timeout: 10
 
-  - name: ROARS Status Page
+  - name: CSConfs
     type: http
-    url: https://uptime.roars.dev
+    url: https://roars.dev/csconfs
     timeout: 10
 
-  - name: Example SSH Server
-    type: tcp
-    host: example.roars.dev
-    port: 22
-    timeout: 5
+  - name: CSPicks
+    type: http
+    url: https://cspicks.roars.dev
+    timeout: 10
+
+  # Machines (VPN-only, checked in via scripts/heartbeat.py cron)
+  - name: Taco
+    type: heartbeat
+    slug: taco
+
+  - name: Sushi
+    type: heartbeat
+    slug: sushi
+
+  - name: Boba
+    type: heartbeat
+    slug: boba
+
+  - name: Pizza
+    type: heartbeat
+    slug: pizza
