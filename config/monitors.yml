@@ -1,0 +1,33 @@
+# Monitors checked by scripts/check.py every 5 minutes via GitHub Actions.
+#
+# Add or remove entries freely -- each one becomes a row on the status page.
+#
+# Common fields:
+#   name    - display name (must be unique, used as the history key)
+#   type    - "http" or "tcp"
+#   timeout - seconds to wait before treating the check as failed (default: 10)
+#
+# http fields:
+#   url             - full URL to request
+#   expected_status - optional, defaults to "2xx/3xx healthy"; set e.g. [200] to be strict
+#
+# tcp fields:
+#   host - hostname or IP
+#   port - TCP port number
+
+monitors:
+  - name: ROARS Website
+    type: http
+    url: https://roars.dev
+    timeout: 10
+
+  - name: ROARS Status Page
+    type: http
+    url: https://uptime.roars.dev
+    timeout: 10
+
+  - name: Example SSH Server
+    type: tcp
+    host: example.roars.dev
+    port: 22
+    timeout: 5

@@ -1,0 +1,83 @@
+name: Monitor
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+# Serialize runs so two overlapping executions never race on the "data"
+# branch or on a Pages deployment. Runs queue rather than cancel each other,
+# since a check should finish in seconds and we don't want a half-applied
+# history update.
+concurrency:
+  group: "status-monitor"
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Prepare data branch worktree
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            git fetch origin data:data
+            git worktree add data-branch data
+          else
+            echo "no 'data' branch yet, creating an orphan one"
+            git worktree add --orphan -b data data-branch
+          fi
+          mkdir -p data-branch/data
+
+      - name: Run checks
+        run: python scripts/check.py --config config/monitors.yml --data-dir data-branch/data
+
+      - name: Commit updated history
+        working-directory: data-branch
+        run: |
+          git add data
+          if git diff --cached --quiet; then
+            echo "no changes to commit"
+          else
+            git commit -m "update status $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push origin data
+          fi
+
+      - name: Assemble Pages site
+        run: |
+          mkdir -p dist/data
+          cp site/index.html site/style.css site/app.js dist/
+          cp data-branch/data/status.json data-branch/data/history.json dist/data/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
