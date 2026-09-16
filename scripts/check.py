@@ -146,6 +146,7 @@ def run_check(monitor: dict, data_dir: str) -> dict:
         result = check_heartbeat(monitor, data_dir)
     result["name"] = monitor["name"]
     result["type"] = monitor["type"]
+    result["url"] = monitor.get("url")
     return result
 
 
@@ -240,6 +241,7 @@ def build_status(results: list[dict], history: dict, now_ts: int, bar_samples: i
         monitors_out.append({
             "name": r["name"],
             "type": r["type"],
+            "url": r.get("url"),
             "status": r["status"],
             "latency_ms": r["latency_ms"],
             "message": r["message"],
@@ -305,6 +307,7 @@ def render_html(status: dict) -> str:
         else:
             status_html = "<strong>Offline</strong>"
 
+        name_html = f'<a href="{m["url"]}">{m["name"]}</a>' if m.get("url") else m["name"]
         latency = f"{m['latency_ms']} ms" if m.get("latency_ms") is not None else "--"
         u24 = f"{m['uptime_24h']}%" if m.get("uptime_24h") is not None else "n/a"
         u7d = f"{m['uptime_7d']}%" if m.get("uptime_7d") is not None else "n/a"
@@ -313,7 +316,7 @@ def render_html(status: dict) -> str:
 
         rows.append(
             f"      <tr>\n"
-            f"        <td><strong>{m['name']}</strong></td>\n"
+            f"        <td><strong>{name_html}</strong></td>\n"
             f"        <td><code>{m['type']}</code></td>\n"
             f"        <td>{status_html}</td>\n"
             f"        <td>{latency}</td>\n"
