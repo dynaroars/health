@@ -464,45 +464,28 @@ def render_html(status: dict) -> str:
     else:
         overall_msg = "<strong>Degraded performance / partial outage</strong>"
 
-    rows = []
-    telemetry_details = []
+    monitor_cards = []
 
     for m in monitors:
         status_str = m["status"]
         if status_str == "up":
-            status_html = "<span>Operational</span>"
+            status_badge = "<span>Operational</span>"
         else:
-            status_html = "<strong>Offline</strong>"
+            status_badge = "<strong style='color: #cb4b16;'>Offline</strong>"
 
         name_html = f'<a href="{m["url"]}">{m["name"]}</a>' if m.get("url") else m["name"]
-        latency = f"{m['latency_ms']} ms" if m.get("latency_ms") is not None else "--"
-        u24 = f"{m['uptime_24h']}%" if m.get("uptime_24h") is not None else "n/a"
-        u7d = f"{m['uptime_7d']}%" if m.get("uptime_7d") is not None else "n/a"
-        u30d = f"{m['uptime_30d']}%" if m.get("uptime_30d") is not None else "n/a"
+        latency_str = f"<code>{m['latency_ms']} ms</code>" if m.get("latency_ms") is not None else "<code>--</code>"
+        u24 = f"<code>24h: {m['uptime_24h']}%</code>" if m.get("uptime_24h") is not None else "<code>24h: n/a</code>"
+        u7d = f"<code>7d: {m['uptime_7d']}%</code>" if m.get("uptime_7d") is not None else "<code>7d: n/a</code>"
+        u30d = f"<code>30d: {m['uptime_30d']}%</code>" if m.get("uptime_30d") is not None else "<code>30d: n/a</code>"
         
         t = m.get("telemetry", {})
         spark = t.get("sparkline_24h", "────────")
-        p50_p95 = f"{t.get('p50') or '--'} / {t.get('p95') or '--'} ms" if t.get("p50") else "--"
+        p50_p95 = f"<code>p50/p95: {t.get('p50') or '--'}/{t.get('p95') or '--'} ms</code>" if t.get("p50") else ""
 
         tls = m.get("tls")
-        tls_badge = f"{tls['days_left']}d left" if tls else "--"
+        tls_badge = f"<small>TLS: {tls['days_left']}d left</small>" if tls else ""
 
-        rows.append(
-            f"      <tr>\n"
-            f"        <td><strong>{name_html}</strong></td>\n"
-            f"        <td><code>{m['type']}</code></td>\n"
-            f"        <td>{status_html}</td>\n"
-            f"        <td>{latency}</td>\n"
-            f"        <td><code>{spark}</code></td>\n"
-            f"        <td>{p50_p95}</td>\n"
-            f"        <td>{u24}</td>\n"
-            f"        <td>{u7d}</td>\n"
-            f"        <td>{u30d}</td>\n"
-            f"        <td><small>{tls_badge}</small></td>\n"
-            f"      </tr>"
-        )
-
-        # Build telemetry card in <details>
         target_str = m.get("url") or f"{m.get('host')}:{m.get('port')}" or m.get("name")
         server_str = m.get("server") or "Unknown"
         tls_info_str = "None"
@@ -514,9 +497,22 @@ def render_html(status: dict) -> str:
         stddev_val = t.get('stddev')
         stddev_str = f"±{stddev_val}ms" if stddev_val is not None else "--"
 
-        telemetry_details.append(f"""
+        summary_parts = [
+            f"<strong>{name_html}</strong>",
+            status_badge,
+            latency_str,
+            f"<code>{spark}</code>",
+            p50_p95,
+            u24,
+            u7d,
+            u30d,
+            tls_badge,
+        ]
+        summary_line = " &middot; ".join(p for p in summary_parts if p)
+
+        monitor_cards.append(f"""
   <details class="myborder" style="margin-bottom: 1em;">
-    <summary><strong>{m['name']}</strong> &mdash; <code>{target_str}</code></summary>
+    <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
     <pre><code>=== SRE & Availability ===
 Availability (30d): {t.get('nines', 'n/a')}
 Current Streak:     {t.get('streak', 0)} consecutive checks passed (~{t.get('streak_hours', 0)} hours)
@@ -538,8 +534,7 @@ TLS Details:        {tls_info_str}
 {curl_cmd}</code></pre>
   </details>""")
 
-    table_rows = "\n".join(rows) if rows else "      <tr><td colspan='10'>No monitors configured.</td></tr>"
-    telemetry_section = "\n".join(telemetry_details)
+    cards_html = "\n".join(monitor_cards) if monitor_cards else "<p>No monitors configured.</p>"
 
     incidents_html = ""
     if incidents:
@@ -572,33 +567,11 @@ TLS Details:        {tls_info_str}
   <h1><a href="https://roars.dev">ROARS</a> Status</h1>
 
   <blockquote>
-    {overall_msg} &mdash; checks run every 5 minutes via GitHub Actions.
+    {overall_msg} &mdash; checks run every 5 minutes via GitHub Actions. Click any service below for telemetry and diagnostics.
   </blockquote>
 
-  <h2>Services &amp; Endpoints</h2>
-  <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
-    <thead>
-      <tr style="text-align: left;">
-        <th>Monitor</th>
-        <th>Type</th>
-        <th>Status</th>
-        <th>Latency</th>
-        <th>24h Trend</th>
-        <th>p50 / p95</th>
-        <th>24h</th>
-        <th>7d</th>
-        <th>30d</th>
-        <th>TLS Cert</th>
-      </tr>
-    </thead>
-    <tbody>
-{table_rows}
-    </tbody>
-  </table>
-
-  <h2>Deep Telemetry &amp; Diagnostics</h2>
-  <p><small>Click any endpoint below to inspect latency distributions, SRE availability, TLS certs, and CLI commands.</small></p>
-{telemetry_section}
+  <h2>Monitors</h2>
+{cards_html}
 {incidents_html}
   <hr>
   <p><small>Updated automatically every 5 minutes &middot; Pure HTML &amp; CSS (Zero JS)</small></p>
