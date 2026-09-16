@@ -554,6 +554,13 @@ TLS Details:        {tls_info_str}
   </ul>
 """
 
+    updated_iso = status.get("updated", "")
+    if updated_iso:
+        dt = datetime.fromisoformat(updated_iso.replace("Z", "+00:00"))
+        updated_str = dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+    else:
+        updated_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -574,7 +581,7 @@ TLS Details:        {tls_info_str}
 {cards_html}
 {incidents_html}
   <hr>
-  <p><small>Updated automatically every 5 minutes &middot; Pure HTML &amp; CSS (Zero JS)</small></p>
+  <p><small>Last updated: {updated_str}</small></p>
 </body>
 </html>
 """
