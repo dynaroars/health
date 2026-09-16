@@ -83,12 +83,12 @@ monitors:
   # Machines (Heartbeat monitors)
   - name: Prime
     group: Machines
-    description: Primary compute server
+    description: Linux server
     type: heartbeat
     slug: prime
 
   - name: Taco
     group: Machines
-    description: Secondary compute server
+    description: Linux server
     type: heartbeat
     slug: taco
