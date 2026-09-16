@@ -536,45 +536,25 @@ def render_html(status: dict) -> str:
         m_type = m.get("type", "http")
         if m_type == "heartbeat":
             type_icon = "🖥️"
-            type_badge = "<code>machine</code>"
         elif m_type == "tcp":
             type_icon = "🔌"
-            type_badge = "<code>tcp</code>"
         else:
             type_icon = "🌐"
-            type_badge = "<code>website</code>"
 
         if m.get("url"):
             name_html = f'{type_icon} <a href="{m["url"]}">{m["name"]}</a>'
         else:
             name_html = f'{type_icon} {m["name"]}'
 
-        u24 = f"<code>24h: {m['uptime_24h']}%</code>" if m.get("uptime_24h") is not None else "<code>24h: n/a</code>"
-        u7d = f"<code>7d: {m['uptime_7d']}%</code>" if m.get("uptime_7d") is not None else "<code>7d: n/a</code>"
-        u30d = f"<code>30d: {m['uptime_30d']}%</code>" if m.get("uptime_30d") is not None else "<code>30d: n/a</code>"
+        u24_val = f"{m['uptime_24h']}%" if m.get("uptime_24h") is not None else "n/a"
+        u7d_val = f"{m['uptime_7d']}%" if m.get("uptime_7d") is not None else "n/a"
+        u30d_val = f"{m['uptime_30d']}%" if m.get("uptime_30d") is not None else "n/a"
         t = m.get("telemetry", {})
+
+        summary_line = f"<strong>{name_html}</strong> &middot; {status_badge}"
 
         if m["type"] == "heartbeat":
             ht = m.get("host_telemetry") or {}
-            load_str = f"<code>⚙️ Load: {ht['load'][0]}</code>" if ht.get("load") else ""
-            mem_str = f"<code>🧠 RAM: {ht['mem']['pct']}%</code>" if ht.get("mem", {}).get("pct") is not None else ""
-            disk_str = f"<code>💾 Disk: {ht['disk']['pct']}%</code>" if ht.get("disk", {}).get("pct") is not None else ""
-            age_str = f"<small>Heartbeat: {m.get('heartbeat_age_s', '--')}s ago</small>" if m.get('heartbeat_age_s') is not None else ""
-
-            summary_parts = [
-                f"<strong>{name_html}</strong>",
-                status_badge,
-                type_badge,
-                u24,
-                u7d,
-                u30d,
-                load_str,
-                mem_str,
-                disk_str,
-                age_str,
-            ]
-            summary_line = " &middot; ".join(p for p in summary_parts if p)
-
             uname_val = ht.get("uname", "Unknown")
             uptime_val = ht.get("uptime", "Unknown")
             hostname_val = ht.get("hostname", m["name"])
@@ -599,21 +579,17 @@ Memory Usage:         {mem_val}
 Disk Usage (/):       {disk_val}
 
 === 📊 SRE Availability ===
-Availability (30d): {t.get('nines', 'n/a')}
-Current Streak:     {t.get('streak', 0)} consecutive heartbeats passed (~{t.get('streak_hours', 0)} hours)
-Heartbeats Logged:  {t.get('sample_count', 0)} samples</code></pre>
+Availability (30d):  {t.get('nines', 'n/a')}
+Uptime (24h/7d/30d): {u24_val} / {u7d_val} / {u30d_val}
+Current Streak:      {t.get('streak', 0)} consecutive heartbeats passed (~{t.get('streak_hours', 0)} hours)
+Heartbeats Logged:   {t.get('sample_count', 0)} samples</code></pre>
   </details>""")
 
         else:
-            latency_str = f"<code>⚡ {m['latency_ms']} ms</code>" if m.get("latency_ms") is not None else "<code>--</code>"
             spark = t.get("sparkline_24h", "────────")
-            p50_p95 = f"<code>p50/p95: {t.get('p50') or '--'}/{t.get('p95') or '--'} ms</code>" if t.get("p50") else ""
-
-            tls = m.get("tls")
-            tls_badge = f"<small>🔒 TLS: {tls['days_left']}d left</small>" if tls else ""
-
             target_str = m.get("url") or f"{m.get('host')}:{m.get('port')}" or m.get("name")
             server_str = m.get("server") or "Unknown"
+            tls = m.get("tls")
             tls_info_str = "None"
             if tls:
                 tls_info_str = f"{tls['version']} ({tls['cipher']}) | Issuer: {tls['issuer']} | Expires: {tls['expiry']} ({tls['days_left']} days left)"
@@ -622,40 +598,29 @@ Heartbeats Logged:  {t.get('sample_count', 0)} samples</code></pre>
 
             stddev_val = t.get('stddev')
             stddev_str = f"±{stddev_val}ms" if stddev_val is not None else "--"
-
-            summary_parts = [
-                f"<strong>{name_html}</strong>",
-                status_badge,
-                type_badge,
-                latency_str,
-                f"<code>{spark}</code>",
-                p50_p95,
-                u24,
-                u7d,
-                u30d,
-                tls_badge,
-            ]
-            summary_line = " &middot; ".join(p for p in summary_parts if p)
+            current_lat = f"{m['latency_ms']} ms" if m.get("latency_ms") is not None else "--"
 
             monitor_cards.append(f"""
   <details class="myborder" style="margin-bottom: 1em;">
     <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
     <pre><code>=== 📊 SRE & Availability ===
-Availability (30d): {t.get('nines', 'n/a')}
-Current Streak:     {t.get('streak', 0)} consecutive checks passed (~{t.get('streak_hours', 0)} hours)
-Samples Logged:     {t.get('sample_count', 0)} samples
+Availability (30d):  {t.get('nines', 'n/a')}
+Uptime (24h/7d/30d): {u24_val} / {u7d_val} / {u30d_val}
+Current Streak:      {t.get('streak', 0)} consecutive checks passed (~{t.get('streak_hours', 0)} hours)
+Samples Logged:      {t.get('sample_count', 0)} samples
 
 === ⏱️ Latency Distribution (ms) ===
+Current Latency:     {current_lat}
 min: {t.get('min') or '--'}ms | p50: {t.get('p50') or '--'}ms | p90: {t.get('p90') or '--'}ms | p95: {t.get('p95') or '--'}ms | p99: {t.get('p99') or '--'}ms | max: {t.get('max') or '--'}ms | σ: {stddev_str}
-Sparkline (24h):    {spark}
+Sparkline (24h):     {spark}
 
 === 📈 Latency Histogram ===
 {t.get('histogram', '  No data')}
 
 === 🔒 TLS & Edge Fingerprint ===
-HTTP Status:        {m.get('message', 'n/a')}
-Server Header:      {server_str}
-TLS Details:        {tls_info_str}
+HTTP Status:         {m.get('message', 'n/a')}
+Server Header:       {server_str}
+TLS Details:         {tls_info_str}
 
 === 🛠️ Diagnostic CLI ===
 {curl_cmd}</code></pre>
