@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Privacy-respecting aggregate visitor statistics for ROARS sites.">
+  <title>Visitor Statistics | ROARS</title>
+  <link rel="stylesheet" href="files/org.css">
+</head>
+<body>
+  <header>
+    <h1>Visitor Statistics</h1>
+    <p>Privacy-respecting, aggregate traffic statistics for ROARS sites.</p>
+    <p><a href="index.html">← Status dashboard</a></p>
+  </header>
+
+  <main>
+    <form id="site-form">
+      <label for="site"><strong>Site</strong></label>
+      <select id="site" name="q">
+        <option value="vietprofs.roars.dev">VietProfs</option>
+        <option value="roars.dev">roars.dev</option>
+        <option value="cspicks.roars.dev">CS Picks</option>
+      </select>
+      <button type="submit">Show statistics</button>
+    </form>
+    <p id="site-url"></p>
+
+    <section aria-live="polite" id="stats">
+      <p>Loading visitor statistics…</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>Metrics are aggregate Cloudflare Analytics data; they do not identify individual visitors.</p>
+  </footer>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const SITES = {
+        'vietprofs.roars.dev': 'VietProfs',
+        'roars.dev': 'roars.dev',
+        'cspicks.roars.dev': 'CS Picks',
+      };
+      const API_URL = '/api/stats';
+      const form = document.getElementById('site-form');
+      const select = document.getElementById('site');
+      const stats = document.getElementById('stats');
+      const siteUrl = document.getElementById('site-url');
+      const number = new Intl.NumberFormat('en-US');
+
+      function escapeHtml(value) {
+        const element = document.createElement('span');
+        element.textContent = String(value ?? '');
+        return element.innerHTML;
+      }
+
+      function visits(record) {
+        return record && (record.visits ?? record.uniques ?? 0);
+      }
+
+      function coverage(data, windowDays) {
+        const collected = windowDays === 7 ? data.coverage?.last7Days : data.coverage?.last30Days;
+        return `${collected ?? 0} of ${windowDays} days collected`;
+      }
+
+      function table(headers, rows) {
+        if (!rows.length) return '<p>No data is available yet.</p>';
+        return `<table><thead><tr>${headers.map(header => `<th>${header}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
+      }
+
+      function render(data, hostname) {
+        const name = SITES[hostname];
+        const dailyRows = [...(data.daily || [])].reverse().map(day => `
+          <tr><th scope="row">${escapeHtml(day.date)}</th><td>${number.format(visits(day))}</td><td>${number.format(day.pageViews || 0)}</td><td>${number.format(day.requests || 0)}</td></tr>`);
+        const countryRows = (data.topCountries || []).slice(0, 10).map(country => {
+          const count = country.visits ?? country.count ?? 0;
+          const share = country.pct == null ? '' : `${country.pct.toFixed(1)}%`;
+          return `<tr><th scope="row">${escapeHtml(country.flag || '')} ${escapeHtml(country.name || country.code)}</th><td>${number.format(count)}</td><td>${share}</td></tr>`;
+        });
+        const pageRows = (data.topPages || []).slice(0, 10).map(page =>
+          `<tr><th scope="row">${escapeHtml(page.label || page.path)}</th><td><code>${escapeHtml(page.path)}</code></td><td>${number.format(page.count || 0)}</td></tr>`);
+
+        stats.innerHTML = `
+          <h2>${escapeHtml(name)} traffic</h2>
+          ${data.isDemo ? '<p><strong>Preview data:</strong> the analytics service is not configured.</p>' : ''}
+          <h3>Summary</h3>
+          <dl>
+            <dt>Visits today <small>(UTC day in progress)</small></dt><dd>${number.format(visits(data.today))}</dd>
+            <dt>Visits, last 7 days</dt><dd>${number.format(visits(data.last7Days))} <small>(${coverage(data, 7)})</small></dd>
+            <dt>Visits, last 30 days</dt><dd>${number.format(visits(data.last30Days))} <small>(${coverage(data, 30)})</small></dd>
+            <dt>Successful HTML page views, last 30 days</dt><dd>${number.format(data.last30Days?.pageViews || 0)}</dd>
+            <dt>Request-origin countries, last 7 days</dt><dd>${number.format(data.countriesCount || 0)}</dd>
+          </dl>
+
+          <h3>Daily traffic</h3>
+          ${table(['Date', 'Visits', 'HTML page views', 'HTTP requests'], dailyRows)}
+
+          <h3>Top visitor countries <small>(last 7 days)</small></h3>
+          ${table(['Country', 'Visits', 'Share'], countryRows)}
+
+          <h3>Most requested pages <small>(last 7 days)</small></h3>
+          ${table(['Page', 'Path', 'HTML page views'], pageRows)}
+
+          <h3>Methodology</h3>
+          <ul>
+            <li>Visits are Cloudflare network estimates, not verified unique people.</li>
+            <li>Locations are request-origin network geolocations, not visitor demographics.</li>
+            <li>HTML page views include successful HTML responses; HTTP requests also include assets and may include automated traffic.</li>
+            <li>Cloudflare's live hostname data covers about eight days. The 30-day history grows through a daily archive.</li>
+          </ul>`;
+      }
+
+      async function load(hostname) {
+        const name = SITES[hostname];
+        select.value = hostname;
+        siteUrl.innerHTML = `Viewing <a href="https://${hostname}/">${escapeHtml(name)} (${escapeHtml(hostname)})</a>.`;
+        stats.innerHTML = '<p>Loading visitor statistics…</p>';
+        try {
+          const response = await fetch(`${API_URL}?q=${encodeURIComponent(hostname)}`);
+          if (!response.ok) throw new Error(`The statistics service returned HTTP ${response.status}.`);
+          const data = await response.json();
+          if (!data || (!data.today && !data.last30Days)) throw new Error('The statistics service returned an incomplete response.');
+          render(data, hostname);
+        } catch (error) {
+          stats.innerHTML = `<p><strong>Visitor statistics are temporarily unavailable.</strong> ${escapeHtml(error.message || 'Please try again later.')}</p>`;
+        }
+      }
+
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        const hostname = select.value;
+        history.pushState({}, '', `${location.pathname}?q=${encodeURIComponent(hostname)}`);
+        load(hostname);
+      });
+
+      const requested = new URLSearchParams(location.search).get('q');
+      load(Object.hasOwn(SITES, requested) ? requested : 'vietprofs.roars.dev');
+    })();
+  </script>
+</body>
+</html>

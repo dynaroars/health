@@ -58,6 +58,7 @@ between the workflow's fetch and its push) before being relied on.
 .github/workflows/monitor.yml   the one workflow: check -> commit -> deploy
 config/monitors.yml             monitors to check (edit this to add/remove machines)
 files/org.css                   single stylesheet (pure CSS, light/dark themes)
+visitor-stats.html              shared aggregate visitor-statistics page
 scripts/check.py                the checker & pure HTML generator (stdlib + PyYAML only)
 scripts/heartbeat.py            run via cron ON a VPN-only machine to report it's alive
 scripts/requirements.txt        just PyYAML
@@ -227,6 +228,28 @@ samples to see the uptime bar and percentages populate.
   machines" above) — that keeps the token's blast radius limited to the
   disposable `data` branch even if the machine is compromised.
 
+## Visitor statistics
+
+`visitor-stats.html` is deployed with the status dashboard and uses the same
+`files/org.css` stylesheet. It accepts a hostname in `?q=` (for example,
+`visitor-stats.html?q=roars.dev`) or through its site selector. It calls the
+same-origin `/api/stats` endpoint, which is served by this repository's
+Cloudflare Worker in `worker/index.ts`.
+
+The Worker is configured in `wrangler.jsonc` for `health.roars.dev/api/*` and
+stores an independent daily history for each hostname. Before its first deploy,
+set the analytics token in this Worker (the value is not stored in the repo):
+
+```bash
+npm install
+npx wrangler secret put CLOUDFLARE_API_TOKEN
+npm run deploy:stats-worker
+```
+
+The token needs Cloudflare `Zone.Analytics:Read` permission for `roars.dev`.
+If this dashboard is served from a different custom hostname, change the route
+pattern in `wrangler.jsonc` before deploying.
+
 ## Limitations
 
 - **Not real-time.** GitHub Actions scheduled workflows have a practical
@@ -242,4 +265,3 @@ samples to see the uptime bar and percentages populate.
 - IPv4/IPv6 dual-stack, DNS-round-robin, and geographically distributed
   checks aren't supported — checks run from wherever the GitHub Actions
   runner happens to be.
-

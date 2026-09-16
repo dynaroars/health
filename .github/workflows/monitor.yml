@@ -76,6 +76,7 @@ jobs:
         run: |
           mkdir -p _site/files
           cp index.html _site/
+          cp visitor-stats.html _site/
           cp files/org.css _site/files/
 
       - name: Upload Pages artifact

@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "roars-health-stats-api",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-16",
+  "vars": {
+    "CLOUDFLARE_ZONE_ID": "793e25e750ab903f3e9eb8edc8ac2b2e",
+    "STATS_HOSTNAMES": "vietprofs.roars.dev,roars.dev,cspicks.roars.dev"
+  },
+  "kv_namespaces": [{ "binding": "STATS_KV", "id": "c511a53525e04139b8dc23a2867eb1e4" }],
+  "triggers": { "crons": ["15 1 * * *"] },
+  "routes": [{ "pattern": "health.roars.dev/api/*", "zone_name": "roars.dev" }],
+  "observability": { "enabled": true }
+}

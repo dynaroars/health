@@ -1,0 +1,13 @@
+{
+  "name": "roars-health",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:stats-worker": "tsx --test test/stats-worker.test.ts",
+    "deploy:stats-worker": "wrangler deploy"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.13",
+    "wrangler": "^4.65.0"
+  }
+}
