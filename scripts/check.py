@@ -569,7 +569,7 @@ TLS Details:        {tls_info_str}
   <link rel="stylesheet" type="text/css" href="files/org.css">
 </head>
 <body>
-  <h1>ROARS Status</h1>
+  <h1><a href="https://roars.dev">ROARS</a> Status</h1>
 
   <blockquote>
     {overall_msg} &mdash; checks run every 5 minutes via GitHub Actions.
