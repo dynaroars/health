@@ -557,9 +557,10 @@ TLS Details:        {tls_info_str}
     updated_iso = status.get("updated", "")
     if updated_iso:
         dt = datetime.fromisoformat(updated_iso.replace("Z", "+00:00"))
-        updated_str = dt.strftime("%Y-%m-%d %H:%M:%S UTC")
     else:
-        updated_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        dt = datetime.now(timezone.utc)
+    fallback_str = dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+    iso_str = dt.isoformat().replace("+00:00", "Z")
 
     return f"""<!doctype html>
 <html lang="en">
@@ -581,7 +582,11 @@ TLS Details:        {tls_info_str}
 {cards_html}
 {incidents_html}
   <hr>
-  <p><small>Last updated: {updated_str}</small></p>
+  <p><small>Last updated: <time id="last-updated" datetime="{iso_str}">{fallback_str}</time></small></p>
+  <script>
+    const el = document.getElementById("last-updated");
+    if (el) el.textContent = new Date(el.dateTime).toLocaleString();
+  </script>
 </body>
 </html>
 """
