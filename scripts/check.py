@@ -518,22 +518,37 @@ def render_html(status: dict) -> str:
     overall = status.get("overall", "operational")
 
     if overall == "operational":
-        overall_msg = "<strong>All systems operational</strong>"
+        overall_msg = "🟢 <strong>All systems operational</strong>"
     elif overall == "outage":
-        overall_msg = "<strong>Major outage</strong> &mdash; all monitored services are down"
+        overall_msg = "🔴 <strong>Major outage</strong> &mdash; all monitored services are down"
     else:
-        overall_msg = "<strong>Degraded performance / partial outage</strong>"
+        overall_msg = "🟡 <strong>Degraded performance / partial outage</strong>"
 
     monitor_cards = []
 
     for m in monitors:
         status_str = m["status"]
         if status_str == "up":
-            status_badge = "<span>Operational</span>"
+            status_badge = "<span>🟢 Operational</span>"
         else:
-            status_badge = "<strong style='color: #cb4b16;'>Offline</strong>"
+            status_badge = "<strong style='color: #cb4b16;'>🔴 Offline</strong>"
 
-        name_html = f'<a href="{m["url"]}">{m["name"]}</a>' if m.get("url") else m["name"]
+        m_type = m.get("type", "http")
+        if m_type == "heartbeat":
+            type_icon = "🖥️"
+            type_badge = "<code>machine</code>"
+        elif m_type == "tcp":
+            type_icon = "🔌"
+            type_badge = "<code>tcp</code>"
+        else:
+            type_icon = "🌐"
+            type_badge = "<code>website</code>"
+
+        if m.get("url"):
+            name_html = f'{type_icon} <a href="{m["url"]}">{m["name"]}</a>'
+        else:
+            name_html = f'{type_icon} {m["name"]}'
+
         u24 = f"<code>24h: {m['uptime_24h']}%</code>" if m.get("uptime_24h") is not None else "<code>24h: n/a</code>"
         u7d = f"<code>7d: {m['uptime_7d']}%</code>" if m.get("uptime_7d") is not None else "<code>7d: n/a</code>"
         u30d = f"<code>30d: {m['uptime_30d']}%</code>" if m.get("uptime_30d") is not None else "<code>30d: n/a</code>"
@@ -541,15 +556,15 @@ def render_html(status: dict) -> str:
 
         if m["type"] == "heartbeat":
             ht = m.get("host_telemetry") or {}
-            load_str = f"<code>Load: {ht['load'][0]}</code>" if ht.get("load") else ""
-            mem_str = f"<code>RAM: {ht['mem']['pct']}%</code>" if ht.get("mem", {}).get("pct") is not None else ""
-            disk_str = f"<code>Disk: {ht['disk']['pct']}%</code>" if ht.get("disk", {}).get("pct") is not None else ""
+            load_str = f"<code>⚙️ Load: {ht['load'][0]}</code>" if ht.get("load") else ""
+            mem_str = f"<code>🧠 RAM: {ht['mem']['pct']}%</code>" if ht.get("mem", {}).get("pct") is not None else ""
+            disk_str = f"<code>💾 Disk: {ht['disk']['pct']}%</code>" if ht.get("disk", {}).get("pct") is not None else ""
             age_str = f"<small>Heartbeat: {m.get('heartbeat_age_s', '--')}s ago</small>" if m.get('heartbeat_age_s') is not None else ""
 
             summary_parts = [
                 f"<strong>{name_html}</strong>",
                 status_badge,
-                "<code>machine</code>",
+                type_badge,
                 u24,
                 u7d,
                 u30d,
@@ -572,30 +587,30 @@ def render_html(status: dict) -> str:
             monitor_cards.append(f"""
   <details class="myborder" style="margin-bottom: 1em;">
     <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
-    <pre><code>=== Host & Kernel Information ===
+    <pre><code>=== 🖥️ Host & Kernel Information ===
 Hostname:        {hostname_val}
 Kernel / Uname:  {uname_val}
 System Uptime:   {uptime_val}
 Last Heartbeat:  {m.get('message', 'n/a')}
 
-=== Hardware & Resource Telemetry ===
+=== ⚡ Hardware & Resource Telemetry ===
 CPU Load (1m/5m/15m): {load_val}
 Memory Usage:         {mem_val}
 Disk Usage (/):       {disk_val}
 
-=== SRE Availability ===
+=== 📊 SRE Availability ===
 Availability (30d): {t.get('nines', 'n/a')}
 Current Streak:     {t.get('streak', 0)} consecutive heartbeats passed (~{t.get('streak_hours', 0)} hours)
 Heartbeats Logged:  {t.get('sample_count', 0)} samples</code></pre>
   </details>""")
 
         else:
-            latency_str = f"<code>{m['latency_ms']} ms</code>" if m.get("latency_ms") is not None else "<code>--</code>"
+            latency_str = f"<code>⚡ {m['latency_ms']} ms</code>" if m.get("latency_ms") is not None else "<code>--</code>"
             spark = t.get("sparkline_24h", "────────")
             p50_p95 = f"<code>p50/p95: {t.get('p50') or '--'}/{t.get('p95') or '--'} ms</code>" if t.get("p50") else ""
 
             tls = m.get("tls")
-            tls_badge = f"<small>TLS: {tls['days_left']}d left</small>" if tls else ""
+            tls_badge = f"<small>🔒 TLS: {tls['days_left']}d left</small>" if tls else ""
 
             target_str = m.get("url") or f"{m.get('host')}:{m.get('port')}" or m.get("name")
             server_str = m.get("server") or "Unknown"
@@ -611,6 +626,7 @@ Heartbeats Logged:  {t.get('sample_count', 0)} samples</code></pre>
             summary_parts = [
                 f"<strong>{name_html}</strong>",
                 status_badge,
+                type_badge,
                 latency_str,
                 f"<code>{spark}</code>",
                 p50_p95,
@@ -624,24 +640,24 @@ Heartbeats Logged:  {t.get('sample_count', 0)} samples</code></pre>
             monitor_cards.append(f"""
   <details class="myborder" style="margin-bottom: 1em;">
     <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
-    <pre><code>=== SRE & Availability ===
+    <pre><code>=== 📊 SRE & Availability ===
 Availability (30d): {t.get('nines', 'n/a')}
 Current Streak:     {t.get('streak', 0)} consecutive checks passed (~{t.get('streak_hours', 0)} hours)
 Samples Logged:     {t.get('sample_count', 0)} samples
 
-=== Latency Distribution (ms) ===
+=== ⏱️ Latency Distribution (ms) ===
 min: {t.get('min') or '--'}ms | p50: {t.get('p50') or '--'}ms | p90: {t.get('p90') or '--'}ms | p95: {t.get('p95') or '--'}ms | p99: {t.get('p99') or '--'}ms | max: {t.get('max') or '--'}ms | σ: {stddev_str}
 Sparkline (24h):    {spark}
 
-=== Latency Histogram ===
+=== 📈 Latency Histogram ===
 {t.get('histogram', '  No data')}
 
-=== TLS & Edge Fingerprint ===
+=== 🔒 TLS & Edge Fingerprint ===
 HTTP Status:        {m.get('message', 'n/a')}
 Server Header:      {server_str}
 TLS Details:        {tls_info_str}
 
-=== Diagnostic CLI ===
+=== 🛠️ Diagnostic CLI ===
 {curl_cmd}</code></pre>
   </details>""")
 
@@ -659,7 +675,7 @@ TLS Details:        {tls_info_str}
             inc_items.append(f"    <li><strong>{inc['monitor']}</strong> &mdash; {time_str}</li>")
         incidents_list = "\n".join(inc_items)
         incidents_html = f"""
-  <h2>Recent Incidents</h2>
+  <h2>⚠️ Recent Incidents</h2>
   <ul>
 {incidents_list}
   </ul>
