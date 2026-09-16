@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Run HTTP/TCP checks defined in a YAML config, update rolling history,
-and write out status.json + history.json for the static dashboard.
+compute geeky telemetry & SRE metrics, and write out a pure static HTML dashboard.
 
 Usage:
     python scripts/check.py --config config/monitors.yml --data-dir data
@@ -10,8 +10,11 @@ from __future__ import annotations
 import argparse
 import http.client
 import json
+import math
 import os
 import socket
+import ssl
+import statistics
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -26,6 +29,7 @@ RETENTION_DAYS_DEFAULT = 30
 BAR_SAMPLES_DEFAULT = 50
 INCIDENT_LIMIT_DEFAULT = 20
 UPTIME_WINDOWS = {"24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400}
+SPARK_CHARS = [" ", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
 
 
 # --------------------------------------------------------------------------
@@ -55,38 +59,77 @@ def load_config(path: str) -> list[dict]:
 
 
 # --------------------------------------------------------------------------
-# Checks
+# Checks & TLS Inspection
 # --------------------------------------------------------------------------
+
+def inspect_tls(hostname: str, port: int = 443, timeout: int = 5) -> dict | None:
+    try:
+        ctx = ssl.create_default_context()
+        with socket.create_connection((hostname, port), timeout=timeout) as sock:
+            with ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
+                cert = ssock.getpeercert()
+                cipher = ssock.cipher()
+                version = ssock.version()
+                if not cert or "notAfter" not in cert:
+                    return None
+                exp_date = datetime.strptime(cert["notAfter"], "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
+                days_left = (exp_date - datetime.now(timezone.utc)).days
+                issuer_dict = dict(x[0] for x in cert.get("issuer", []))
+                issuer = issuer_dict.get("organizationName") or issuer_dict.get("commonName") or "Unknown"
+                return {
+                    "version": version,
+                    "cipher": cipher[0] if cipher else "Unknown",
+                    "issuer": issuer,
+                    "days_left": days_left,
+                    "expiry": exp_date.strftime("%Y-%m-%d"),
+                }
+    except Exception:
+        return None
+
 
 def check_http(monitor: dict) -> dict:
     url = monitor["url"]
     timeout = monitor.get("timeout", DEFAULT_TIMEOUT)
     parts = urlsplit(url)
-    conn_cls = http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
+    is_https = parts.scheme == "https"
+    conn_cls = http.client.HTTPSConnection if is_https else http.client.HTTPConnection
+    port = parts.port or (443 if is_https else 80)
     path = parts.path or "/"
     if parts.query:
         path += "?" + parts.query
 
     start = time.monotonic()
     conn = None
+    server_hdr = None
+    tls_info = None
+
     try:
-        conn = conn_cls(parts.hostname, parts.port, timeout=timeout)
+        conn = conn_cls(parts.hostname, port, timeout=timeout)
         conn.request("GET", path, headers={"User-Agent": "roars-status/1.0", "Host": parts.netloc})
         resp = conn.getresponse()
         latency_ms = round((time.monotonic() - start) * 1000)
         code = resp.status
+        server_hdr = resp.getheader("Server")
         healthy = 200 <= code < 400
+
+        if is_https and parts.hostname:
+            tls_info = inspect_tls(parts.hostname, port, timeout=min(timeout, 5))
+
         return {
             "status": "up" if healthy else "down",
             "latency_ms": latency_ms,
             "message": f"HTTP {code}",
+            "server": server_hdr,
+            "tls": tls_info,
         }
-    except Exception as e:  # noqa: BLE001 - any failure means the check is down
+    except Exception as e:
         latency_ms = round((time.monotonic() - start) * 1000)
         return {
             "status": "down",
             "latency_ms": None,
             "message": f"{type(e).__name__}: {e}",
+            "server": None,
+            "tls": None,
         }
     finally:
         if conn is not None:
@@ -103,37 +146,54 @@ def check_tcp(monitor: dict) -> dict:
         with socket.create_connection((host, port), timeout=timeout):
             pass
         latency_ms = round((time.monotonic() - start) * 1000)
-        return {"status": "up", "latency_ms": latency_ms, "message": f"connected to {host}:{port}"}
-    except Exception as e:  # noqa: BLE001
+        return {
+            "status": "up",
+            "latency_ms": latency_ms,
+            "message": f"connected to {host}:{port}",
+            "server": None,
+            "tls": None,
+        }
+    except Exception as e:
         latency_ms = round((time.monotonic() - start) * 1000)
         return {
             "status": "down",
             "latency_ms": None,
             "message": f"{type(e).__name__}: {e}",
+            "server": None,
+            "tls": None,
         }
 
 
 def check_heartbeat(monitor: dict, data_dir: str) -> dict:
-    """A "pull-less" check for machines GitHub Actions can't reach directly
-    (e.g. behind a VPN). The machine itself pushes a last-seen timestamp to
-    data/heartbeats/<slug>.json via the GitHub Contents API (see
-    scripts/heartbeat.py); we just judge whether that timestamp is fresh.
-    """
     max_age = monitor.get("max_age", DEFAULT_HEARTBEAT_MAX_AGE)
     path = os.path.join(data_dir, "heartbeats", f"{monitor['slug']}.json")
     if not os.path.exists(path):
-        return {"status": "down", "latency_ms": None, "message": "no heartbeat received yet"}
+        return {
+            "status": "down",
+            "latency_ms": None,
+            "message": "no heartbeat received yet",
+            "server": None,
+            "tls": None,
+        }
     try:
         with open(path, "r") as f:
             last_seen = datetime.fromisoformat(json.load(f)["last_seen"].replace("Z", "+00:00"))
     except (json.JSONDecodeError, KeyError, ValueError) as e:
-        return {"status": "down", "latency_ms": None, "message": f"invalid heartbeat file: {e}"}
+        return {
+            "status": "down",
+            "latency_ms": None,
+            "message": f"invalid heartbeat file: {e}",
+            "server": None,
+            "tls": None,
+        }
     age = (datetime.now(timezone.utc) - last_seen).total_seconds()
     healthy = 0 <= age <= max_age
     return {
         "status": "up" if healthy else "down",
         "latency_ms": None,
         "message": f"last heartbeat {round(age)}s ago" if healthy else f"stale heartbeat ({round(age)}s ago, max {max_age}s)",
+        "server": None,
+        "tls": None,
     }
 
 
@@ -147,6 +207,8 @@ def run_check(monitor: dict, data_dir: str) -> dict:
     result["name"] = monitor["name"]
     result["type"] = monitor["type"]
     result["url"] = monitor.get("url")
+    result["host"] = monitor.get("host")
+    result["port"] = monitor.get("port")
     return result
 
 
@@ -159,12 +221,11 @@ def run_checks(monitors: list[dict], workers: int, data_dir: str) -> list[dict]:
         for future in as_completed(futures):
             name = futures[future]
             results[name] = future.result()
-    # preserve config order for a stable dashboard layout
     return [results[m["name"]] for m in monitors]
 
 
 # --------------------------------------------------------------------------
-# History (rolling retention)
+# History & Statistics (Rolling Retention)
 # --------------------------------------------------------------------------
 
 def load_history(path: str) -> dict:
@@ -183,7 +244,6 @@ def update_history(history: dict, results: list[dict], now_ts: int, retention_da
     cutoff = now_ts - retention_days * 86400
     valid_names = {r["name"] for r in results}
 
-    # drop history for monitors that no longer exist in the config
     for name in list(history["monitors"].keys()):
         if name not in valid_names:
             del history["monitors"][name]
@@ -191,8 +251,6 @@ def update_history(history: dict, results: list[dict], now_ts: int, retention_da
     for r in results:
         samples = history["monitors"].setdefault(r["name"], [])
         samples.append([now_ts, 1 if r["status"] == "up" else 0, r["latency_ms"]])
-        # prune old samples (samples are appended in increasing ts order, so
-        # this is a cheap linear scan from the front)
         i = 0
         while i < len(samples) and samples[i][0] < cutoff:
             i += 1
@@ -224,7 +282,107 @@ def compute_incidents(name: str, samples: list[list], limit: int) -> list[dict]:
 
 
 # --------------------------------------------------------------------------
-# Status output
+# Geeky Telemetry, Sparklines & SRE Math
+# --------------------------------------------------------------------------
+
+def make_sparkline(values: list[int | float]) -> str:
+    if not values:
+        return "────────"
+    valid = [v for v in values if v is not None]
+    if not valid:
+        return "────────"
+    min_v, max_v = min(valid), max(valid)
+    if min_v == max_v:
+        return "▅" * len(valid)
+    res = []
+    for v in valid:
+        idx = int((v - min_v) / (max_v - min_v) * (len(SPARK_CHARS) - 1))
+        res.append(SPARK_CHARS[min(idx, len(SPARK_CHARS) - 1)])
+    return "".join(res)
+
+
+def make_histogram(latencies: list[int | float]) -> str:
+    if not latencies:
+        return "  No latency data available."
+    buckets = [
+        ("< 100ms", lambda x: x < 100),
+        ("100-200ms", lambda x: 100 <= x < 200),
+        ("200-500ms", lambda x: 200 <= x < 500),
+        (">= 500ms", lambda x: x >= 500),
+    ]
+    total = len(latencies)
+    lines = []
+    max_bar_width = 25
+    for label, fn in buckets:
+        cnt = sum(1 for x in latencies if fn(x))
+        pct = (cnt / total) * 100 if total else 0
+        bar_len = int((pct / 100) * max_bar_width)
+        bar = "█" * bar_len
+        lines.append(f"  {label:<10} [{bar:<25}] {cnt:>4} ({pct:>5.1f}%)")
+    return "\n".join(lines)
+
+
+def calc_telemetry(samples: list[list]) -> dict:
+    # samples: [ts, status (1/0), latency_ms]
+    latencies = [s[2] for s in samples if s[1] == 1 and s[2] is not None]
+    
+    # Streak count (consecutive 1s from the latest backwards)
+    streak = 0
+    for s in reversed(samples):
+        if s[1] == 1:
+            streak += 1
+        else:
+            break
+    streak_hours = round(streak * 5 / 60, 1)
+
+    # Mathematical Nines of availability
+    up_count = sum(1 for s in samples if s[1] == 1)
+    total_count = len(samples)
+    uptime_ratio = up_count / total_count if total_count else 1.0
+    if uptime_ratio >= 1.0:
+        nines = "5+ nines (100%)"
+    elif uptime_ratio <= 0.0:
+        nines = "0 nines (0%)"
+    else:
+        unavail = 1.0 - uptime_ratio
+        val = -math.log10(unavail)
+        nines = f"{val:.2f} nines ({uptime_ratio*100:.2f}%)"
+
+    if not latencies:
+        return {
+            "p50": None, "p90": None, "p95": None, "p99": None, "min": None, "max": None, "stddev": None,
+            "streak": streak, "streak_hours": streak_hours, "nines": nines,
+            "sparkline_24h": "────────", "histogram": "  No latency data available.", "sample_count": total_count
+        }
+
+    sorted_lat = sorted(latencies)
+    def pctile(p: float) -> int:
+        k = (len(sorted_lat) - 1) * (p / 100.0)
+        f = math.floor(k)
+        c = math.ceil(k)
+        if f == c:
+            return sorted_lat[int(k)]
+        return round(sorted_lat[int(f)] * (c - k) + sorted_lat[int(c)] * (k - f))
+
+    p50 = pctile(50)
+    p90 = pctile(90)
+    p95 = pctile(95)
+    p99 = pctile(99)
+    min_lat = sorted_lat[0]
+    max_lat = sorted_lat[-1]
+    stddev = round(statistics.stdev(latencies), 1) if len(latencies) > 1 else 0.0
+    sparkline_24h = make_sparkline(latencies[-24:])
+    histogram = make_histogram(latencies)
+
+    return {
+        "p50": p50, "p90": p90, "p95": p95, "p99": p99, "min": min_lat, "max": max_lat, "stddev": stddev,
+        "streak": streak, "streak_hours": streak_hours, "nines": nines,
+        "sparkline_24h": sparkline_24h, "histogram": histogram, "sample_count": total_count
+    }
+
+
+# --------------------------------------------------------------------------
+# Status Output
 # --------------------------------------------------------------------------
 
 def iso(ts: int) -> str:
@@ -238,18 +396,25 @@ def build_status(results: list[dict], history: dict, now_ts: int, bar_samples: i
     for r in results:
         samples = history["monitors"].get(r["name"], [])
         bar = [s[1] for s in samples[-bar_samples:]]
+        telemetry = calc_telemetry(samples)
+
         monitors_out.append({
             "name": r["name"],
             "type": r["type"],
             "url": r.get("url"),
+            "host": r.get("host"),
+            "port": r.get("port"),
             "status": r["status"],
             "latency_ms": r["latency_ms"],
             "message": r["message"],
+            "server": r.get("server"),
+            "tls": r.get("tls"),
             "checked_at": iso(now_ts),
             "uptime_24h": uptime_pct(samples, now_ts, UPTIME_WINDOWS["24h"]),
             "uptime_7d": uptime_pct(samples, now_ts, UPTIME_WINDOWS["7d"]),
             "uptime_30d": uptime_pct(samples, now_ts, UPTIME_WINDOWS["30d"]),
             "history": bar,
+            "telemetry": telemetry,
         })
         for inc in compute_incidents(r["name"], samples, incident_limit):
             all_incidents.append({
@@ -284,7 +449,7 @@ def atomic_write_json(path: str, data) -> None:
 
 
 # --------------------------------------------------------------------------
-# HTML rendering (Pure HTML + org.css, zero JavaScript)
+# Pure HTML + org.css Renderer (Zero JavaScript)
 # --------------------------------------------------------------------------
 
 def render_html(status: dict) -> str:
@@ -300,6 +465,8 @@ def render_html(status: dict) -> str:
         overall_msg = "<strong>Degraded performance / partial outage</strong>"
 
     rows = []
+    telemetry_details = []
+
     for m in monitors:
         status_str = m["status"]
         if status_str == "up":
@@ -312,7 +479,13 @@ def render_html(status: dict) -> str:
         u24 = f"{m['uptime_24h']}%" if m.get("uptime_24h") is not None else "n/a"
         u7d = f"{m['uptime_7d']}%" if m.get("uptime_7d") is not None else "n/a"
         u30d = f"{m['uptime_30d']}%" if m.get("uptime_30d") is not None else "n/a"
-        message = m.get("message") or ""
+        
+        t = m.get("telemetry", {})
+        spark = t.get("sparkline_24h", "────────")
+        p50_p95 = f"{t.get('p50') or '--'} / {t.get('p95') or '--'} ms" if t.get("p50") else "--"
+
+        tls = m.get("tls")
+        tls_badge = f"{tls['days_left']}d left" if tls else "--"
 
         rows.append(
             f"      <tr>\n"
@@ -320,14 +493,53 @@ def render_html(status: dict) -> str:
             f"        <td><code>{m['type']}</code></td>\n"
             f"        <td>{status_html}</td>\n"
             f"        <td>{latency}</td>\n"
+            f"        <td><code>{spark}</code></td>\n"
+            f"        <td>{p50_p95}</td>\n"
             f"        <td>{u24}</td>\n"
             f"        <td>{u7d}</td>\n"
             f"        <td>{u30d}</td>\n"
-            f"        <td><small>{message}</small></td>\n"
+            f"        <td><small>{tls_badge}</small></td>\n"
             f"      </tr>"
         )
 
-    table_rows = "\n".join(rows) if rows else "      <tr><td colspan='8'>No monitors configured.</td></tr>"
+        # Build telemetry card in <details>
+        target_str = m.get("url") or f"{m.get('host')}:{m.get('port')}" or m.get("name")
+        server_str = m.get("server") or "Unknown"
+        tls_info_str = "None"
+        if tls:
+            tls_info_str = f"{tls['version']} ({tls['cipher']}) | Issuer: {tls['issuer']} | Expires: {tls['expiry']} ({tls['days_left']} days left)"
+
+        curl_cmd = f"curl -Iv {m['url']}" if m.get("url") else f"nc -zv {m.get('host')} {m.get('port')}"
+
+        stddev_val = t.get('stddev')
+        stddev_str = f"±{stddev_val}ms" if stddev_val is not None else "--"
+
+        telemetry_details.append(f"""
+  <details class="myborder" style="margin-bottom: 1em;">
+    <summary><strong>{m['name']}</strong> &mdash; <code>{target_str}</code></summary>
+    <pre><code>=== SRE & Availability ===
+Availability (30d): {t.get('nines', 'n/a')}
+Current Streak:     {t.get('streak', 0)} consecutive checks passed (~{t.get('streak_hours', 0)} hours)
+Samples Logged:     {t.get('sample_count', 0)} samples
+
+=== Latency Distribution (ms) ===
+min: {t.get('min') or '--'}ms | p50: {t.get('p50') or '--'}ms | p90: {t.get('p90') or '--'}ms | p95: {t.get('p95') or '--'}ms | p99: {t.get('p99') or '--'}ms | max: {t.get('max') or '--'}ms | σ: {stddev_str}
+Sparkline (24h):    {spark}
+
+=== Latency Histogram ===
+{t.get('histogram', '  No data')}
+
+=== TLS & Edge Fingerprint ===
+HTTP Status:        {m.get('message', 'n/a')}
+Server Header:      {server_str}
+TLS Details:        {tls_info_str}
+
+=== Diagnostic CLI ===
+{curl_cmd}</code></pre>
+  </details>""")
+
+    table_rows = "\n".join(rows) if rows else "      <tr><td colspan='10'>No monitors configured.</td></tr>"
+    telemetry_section = "\n".join(telemetry_details)
 
     incidents_html = ""
     if incidents:
@@ -363,7 +575,7 @@ def render_html(status: dict) -> str:
     {overall_msg} &mdash; checks run every 5 minutes via GitHub Actions.
   </blockquote>
 
-  <h2>Services &amp; Machines</h2>
+  <h2>Services &amp; Endpoints</h2>
   <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
     <thead>
       <tr style="text-align: left;">
@@ -371,18 +583,25 @@ def render_html(status: dict) -> str:
         <th>Type</th>
         <th>Status</th>
         <th>Latency</th>
+        <th>24h Trend</th>
+        <th>p50 / p95</th>
         <th>24h</th>
         <th>7d</th>
         <th>30d</th>
-        <th>Details</th>
+        <th>TLS Cert</th>
       </tr>
     </thead>
     <tbody>
 {table_rows}
     </tbody>
   </table>
+
+  <h2>Deep Telemetry &amp; Diagnostics</h2>
+  <p><small>Click any endpoint below to inspect latency distributions, SRE availability, TLS certs, and CLI commands.</small></p>
+{telemetry_section}
 {incidents_html}
-  <p><small>Automatically updated every 5 minutes &middot; Pure HTML &amp; CSS</small></p>
+  <hr>
+  <p><small>Updated automatically every 5 minutes &middot; Pure HTML &amp; CSS (Zero JS)</small></p>
 </body>
 </html>
 """
