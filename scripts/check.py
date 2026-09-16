@@ -259,6 +259,8 @@ def run_check(monitor: dict, data_dir: str) -> dict:
         result = check_heartbeat(monitor, data_dir)
     result["name"] = monitor["name"]
     result["type"] = monitor["type"]
+    result["group"] = monitor.get("group")
+    result["description"] = monitor.get("description")
     result["url"] = monitor.get("url")
     result["host"] = monitor.get("host")
     result["port"] = monitor.get("port")
@@ -495,6 +497,8 @@ def build_status(results: list[dict], history: dict, now_ts: int, bar_samples: i
         monitors_out.append({
             "name": r["name"],
             "type": r["type"],
+            "group": r.get("group"),
+            "description": r.get("description"),
             "url": r.get("url"),
             "host": r.get("host"),
             "port": r.get("port"),
@@ -565,73 +569,86 @@ def render_html(status: dict) -> str:
     else:
         overall_msg = "🟡 <strong>Degraded performance / partial outage</strong>"
 
-    monitor_cards = []
-
+    groups: dict[str, list[dict]] = {}
     for m in monitors:
-        status_str = m["status"]
-        if status_str == "up":
-            status_badge = "<span>🟢 Operational</span>"
-        else:
-            status_badge = "<strong style='color: #cb4b16;'>🔴 Offline</strong>"
+        gname = m.get("group") or "Monitors"
+        if gname not in groups:
+            groups[gname] = []
+        groups[gname].append(m)
 
-        m_type = m.get("type", "http")
-        if m_type == "heartbeat":
-            type_icon = "🖥️"
-        elif m_type == "tcp":
-            type_icon = "🔌"
-        else:
-            type_icon = "🌐"
+    rendered_groups = []
 
-        if m.get("url"):
-            name_html = f'{type_icon} <a href="{m["url"]}">{m["name"]}</a>'
-        else:
-            name_html = f'{type_icon} {m["name"]}'
+    for gname, gmonitors in groups.items():
+        group_cards = []
+        for m in gmonitors:
+            status_str = m["status"]
+            if status_str == "up":
+                status_badge = "<span>🟢 Operational</span>"
+            else:
+                status_badge = "<strong style='color: #cb4b16;'>🔴 Offline</strong>"
 
-        u24_val = f"{m['uptime_24h']}%" if m.get("uptime_24h") is not None else "n/a"
-        u7d_val = f"{m['uptime_7d']}%" if m.get("uptime_7d") is not None else "n/a"
-        u30d_val = f"{m['uptime_30d']}%" if m.get("uptime_30d") is not None else "n/a"
-        t = m.get("telemetry", {})
-        bar_24h = t.get("bar_24h", "█" * 24)
+            m_type = m.get("type", "http")
+            if m_type == "heartbeat":
+                type_icon = "🖥️"
+            elif m_type == "tcp":
+                type_icon = "🔌"
+            else:
+                type_icon = "🌐"
 
-        summary_line = f"<strong>{name_html}</strong> &middot; {status_badge} &middot; <code>[24h ago {bar_24h} now] {u24_val}</code>"
+            if m.get("url"):
+                name_html = f'{type_icon} <a href="{m["url"]}">{m["name"]}</a>'
+            else:
+                name_html = f'{type_icon} {m["name"]}'
 
-        if m["type"] == "heartbeat":
-            ht = m.get("host_telemetry") or {}
-            
-            if ht.get("os"):
-                os_val = ht["os"]
-            elif ht.get("uname"):
-                uname_lower = ht["uname"].lower()
-                if "debian" in uname_lower:
-                    os_val = "Debian Linux (x86_64)"
-                elif "ubuntu" in uname_lower:
-                    os_val = "Ubuntu Linux (x86_64)"
+            desc_str = m.get("description", "")
+            desc_badge = f'<span style="font-weight: normal; opacity: 0.8; font-size: 0.9em;"> &mdash; {desc_str}</span>' if desc_str else ""
+
+            u24_val = f"{m['uptime_24h']}%" if m.get("uptime_24h") is not None else "n/a"
+            u7d_val = f"{m['uptime_7d']}%" if m.get("uptime_7d") is not None else "n/a"
+            u30d_val = f"{m['uptime_30d']}%" if m.get("uptime_30d") is not None else "n/a"
+            t = m.get("telemetry", {})
+            bar_24h = t.get("bar_24h", "█" * 24)
+
+            summary_line = f"<strong>{name_html}</strong>{desc_badge} &middot; {status_badge} &middot; <code>[24h ago {bar_24h} now] {u24_val}</code>"
+
+            if m["type"] == "heartbeat":
+                ht = m.get("host_telemetry") or {}
+                
+                if ht.get("os"):
+                    os_val = ht["os"]
+                elif ht.get("uname"):
+                    uname_lower = ht["uname"].lower()
+                    if "debian" in uname_lower:
+                        os_val = "Debian Linux (x86_64)"
+                    elif "ubuntu" in uname_lower:
+                        os_val = "Ubuntu Linux (x86_64)"
+                    else:
+                        os_val = "Linux (x86_64)"
                 else:
                     os_val = "Linux (x86_64)"
-            else:
-                os_val = "Linux (x86_64)"
 
-            uptime_val = ht.get("uptime", "Unknown")
-            hostname_val = ht.get("hostname", m["name"])
-            
-            vpn_val = ""
-            if ht.get("vpn"):
-                vpn_lines = []
-                for iface, vinfo in ht["vpn"].items():
-                    vname = "WireGuard" if iface.startswith("wg") else ("Tailscale" if iface.startswith("tailscale") else "VPN")
-                    rx_tx = f" · RX: {vinfo.get('rx_gb', 0)} GB / TX: {vinfo.get('tx_gb', 0)} GB" if (vinfo.get('rx_gb') or vinfo.get('tx_gb')) else ""
-                    vpn_lines.append(f"{vname} ({iface}) [{vinfo.get('status', 'connected')}]{rx_tx}")
-                vpn_val = f"\nVPN / Network:   {', '.join(vpn_lines)}"
+                uptime_val = ht.get("uptime", "Unknown")
+                hostname_val = ht.get("hostname", m["name"])
+                
+                vpn_val = ""
+                if ht.get("vpn"):
+                    vpn_lines = []
+                    for iface, vinfo in ht["vpn"].items():
+                        vname = "WireGuard" if iface.startswith("wg") else ("Tailscale" if iface.startswith("tailscale") else "VPN")
+                        rx_tx = f" · RX: {vinfo.get('rx_gb', 0)} GB / TX: {vinfo.get('tx_gb', 0)} GB" if (vinfo.get('rx_gb') or vinfo.get('tx_gb')) else ""
+                        vpn_lines.append(f"{vname} ({iface}) [{vinfo.get('status', 'connected')}]{rx_tx}")
+                    vpn_val = f"\nVPN / Network:   {', '.join(vpn_lines)}"
 
-            cpu_val = f"{ht.get('cpu_count', '--')} cores"
-            load_val = f"{ht['load'][0]}, {ht['load'][1]}, {ht['load'][2]} ({cpu_val})" if ht.get("load") else "N/A"
-            mem_val = f"{ht['mem']['used_gb']} GB / {ht['mem']['total_gb']} GB [{make_bar(ht['mem']['pct'])}] {ht['mem']['pct']}%" if ht.get("mem") else "N/A"
-            disk_val = f"{ht['disk']['used_gb']} GB / {ht['disk']['total_gb']} GB [{make_bar(ht['disk']['pct'])}] {ht['disk']['pct']}%" if ht.get("disk") else "N/A"
+                cpu_val = f"{ht.get('cpu_count', '--')} cores"
+                load_val = f"{ht['load'][0]}, {ht['load'][1]}, {ht['load'][2]} ({cpu_val})" if ht.get("load") else "N/A"
+                mem_val = f"{ht['mem']['used_gb']} GB / {ht['mem']['total_gb']} GB [{make_bar(ht['mem']['pct'])}] {ht['mem']['pct']}%" if ht.get("mem") else "N/A"
+                disk_val = f"{ht['disk']['used_gb']} GB / {ht['disk']['total_gb']} GB [{make_bar(ht['disk']['pct'])}] {ht['disk']['pct']}%" if ht.get("disk") else "N/A"
 
-            monitor_cards.append(f"""
+                group_cards.append(f"""
   <details class="myborder" style="margin-bottom: 1em;">
     <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
     <pre><code>=== 🖥️ Host & Platform Information ===
+Description:     {desc_str or 'n/a'}
 Hostname:        {hostname_val}
 Platform / OS:   {os_val}
 System Uptime:   {uptime_val}{vpn_val}
@@ -650,22 +667,22 @@ Current Streak:                {t.get('streak', 0)} consecutive heartbeats passe
 Heartbeats Logged:             {t.get('sample_count', 0)} samples</code></pre>
   </details>""")
 
-        else:
-            spark = t.get("sparkline_24h", "────────")
-            target_str = m.get("url") or f"{m.get('host')}:{m.get('port')}" or m.get("name")
-            server_str = m.get("server") or "Unknown"
-            tls = m.get("tls")
-            tls_info_str = "None"
-            if tls:
-                tls_info_str = f"{tls['version']} ({tls['cipher']}) | Issuer: {tls['issuer']} | Expires: {tls['expiry']} ({tls['days_left']} days left)"
+            else:
+                spark = t.get("sparkline_24h", "────────")
+                target_str = m.get("url") or f"{m.get('host')}:{m.get('port')}" or m.get("name")
+                server_str = m.get("server") or "Unknown"
+                tls = m.get("tls")
+                tls_info_str = "None"
+                if tls:
+                    tls_info_str = f"{tls['version']} ({tls['cipher']}) | Issuer: {tls['issuer']} | Expires: {tls['expiry']} ({tls['days_left']} days left)"
 
-            curl_cmd = f"curl -Iv {m['url']}" if m.get("url") else f"nc -zv {m.get('host')} {m.get('port')}"
+                curl_cmd = f"curl -Iv {m['url']}" if m.get("url") else f"nc -zv {m.get('host')} {m.get('port')}"
 
-            stddev_val = t.get('stddev')
-            stddev_str = f"±{stddev_val}ms" if stddev_val is not None else "--"
-            current_lat = f"{m['latency_ms']} ms" if m.get("latency_ms") is not None else "--"
+                stddev_val = t.get('stddev')
+                stddev_str = f"±{stddev_val}ms" if stddev_val is not None else "--"
+                current_lat = f"{m['latency_ms']} ms" if m.get("latency_ms") is not None else "--"
 
-            monitor_cards.append(f"""
+                group_cards.append(f"""
   <details class="myborder" style="margin-bottom: 1em;">
     <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
     <pre><code>=== 📊 SRE & Availability ===
@@ -684,6 +701,8 @@ Sparkline (24h):               {spark}
 {t.get('histogram', '  No data')}
 
 === 🔒 TLS & Edge Fingerprint ===
+Description:                   {desc_str or 'n/a'}
+Target URL:                    {target_str}
 HTTP Status:                   {m.get('message', 'n/a')}
 Server Header:                 {server_str}
 TLS Details:                   {tls_info_str}
@@ -692,7 +711,12 @@ TLS Details:                   {tls_info_str}
 {curl_cmd}</code></pre>
   </details>""")
 
-    cards_html = "\n".join(monitor_cards) if monitor_cards else "<p>No monitors configured.</p>"
+        if len(groups) > 1 or gname != "Monitors":
+            rendered_groups.append(f"  <h3 style=\"margin-top: 1.5em; margin-bottom: 0.5em;\">{gname}</h3>\n" + "\n".join(group_cards))
+        else:
+            rendered_groups.append("\n".join(group_cards))
+
+    cards_html = "\n".join(rendered_groups) if rendered_groups else "<p>No monitors configured.</p>"
 
     incidents_html = ""
     if incidents:

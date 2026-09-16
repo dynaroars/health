@@ -3,71 +3,92 @@
 # Add or remove entries freely -- each one becomes a row on the status page.
 #
 # Common fields:
-#   name    - display name (must be unique, used as the history key)
-#   type    - "http", "tcp", or "heartbeat"
-#   timeout - seconds to wait before treating the check as failed (default: 10)
+#   name        - display name (must be unique, used as the history key)
+#   group       - category section on status page (e.g. "ROARS Website", "Projects", "Machines")
+#   description - short summary of the service / website / machine
+#   type        - "http", "tcp", or "heartbeat"
+#   timeout     - seconds to wait before treating the check as failed (default: 10)
 #
 # http fields:
-#   url     - full URL to request (2xx/3xx = healthy, redirects not followed)
+#   url         - full URL to request (2xx/3xx = healthy, redirects not followed)
 #
 # tcp fields:
-#   host - hostname or IP
-#   port - TCP port number
+#   host        - hostname or IP
+#   port        - TCP port number
 #
 # heartbeat fields (for machines GitHub Actions can't reach directly, e.g.
 # behind a VPN -- see README.md "VPN-only machines"):
-#   slug     - matches the slug passed to `scripts/heartbeat.py <slug>` on the machine
-#   max_age  - seconds since the last heartbeat before considered down (default: 900)
+#   slug        - matches the slug passed to `scripts/heartbeat.py <slug>` on the machine
+#   max_age     - seconds since the last heartbeat before considered down (default: 900)
 
 monitors:
-  # Sites
+  # ROARS Website & Core Links
   - name: ROARS Website
+    group: ROARS Website
+    description: ROARS Lab at George Mason University
     type: http
     url: https://roars.dev
     timeout: 10
 
+  - name: Code
+    group: ROARS Website
+    description: GitHub repo of ROARS Lab
+    type: http
+    url: https://code.roars.dev
+    timeout: 10
+
+  - name: Photos
+    group: ROARS Website
+    description: Photos of Lab activities
+    type: http
+    url: https://photos.roars.dev
+    timeout: 10
+
+  - name: BibTeX
+    group: ROARS Website
+    description: Online BibTeX converter and publication viewer
+    type: http
+    url: https://bibtex.roars.dev
+    timeout: 10
+
+  # Projects
   - name: VietProfs
+    group: Projects
+    description: Directory of Vietnamese professors worldwide
     type: http
     url: https://vietprofs.roars.dev
     timeout: 10
 
   - name: CSPicks
+    group: Projects
+    description: CS PhD program and research advisor discovery
     type: http
     url: https://cspicks.roars.dev
     timeout: 10
 
   - name: DIG
+    group: Projects
+    description: Dynamic Invariant Generator for program verification
     type: http
     url: https://dig.roars.dev
     timeout: 10
 
-  - name: BibTeX
-    type: http
-    url: https://bibtex.roars.dev
-    timeout: 10
-
   - name: Real GMU CS People
+    group: Projects
+    description: Searchable academic directory of GMU CS faculty
     type: http
     url: https://realgmucs.github.io/people/
     timeout: 10
 
   # Machines (Heartbeat monitors)
   - name: Prime
+    group: Machines
+    description: Primary compute server
     type: heartbeat
     slug: prime
 
   - name: Taco
+    group: Machines
+    description: Secondary compute server
     type: heartbeat
     slug: taco
-  #
-  # - name: Sushi
-  #   type: heartbeat
-  #   slug: sushi
-  #
-  # - name: Boba
-  #   type: heartbeat
-  #   slug: boba
-  #
-  # - name: Pizza
-  #   type: heartbeat
-  #   slug: pizza
