@@ -375,7 +375,46 @@ def make_histogram(latencies: list[int | float]) -> str:
     return "\n".join(lines)
 
 
-def calc_telemetry(samples: list[list]) -> dict:
+def make_24h_uptime_bar(samples: list[list], now_ts: int, slots: int = 24) -> str:
+    if not samples:
+        return "░" * slots
+    
+    cutoff = now_ts - 24 * 3600
+    w_samples = [s for s in samples if s[0] >= cutoff]
+    if not w_samples:
+        w_samples = samples[-slots:]
+    
+    up_cnt = sum(1 for s in w_samples if s[1] == 1)
+    if len(w_samples) < slots and up_cnt == len(w_samples):
+        return "█" * slots
+
+    bucket_sec = (24 * 3600) / slots
+    chars = []
+    oldest_ts = samples[0][0]
+    for i in range(slots):
+        b_start = cutoff + i * bucket_sec
+        b_end = b_start + bucket_sec
+        b_s = [s for s in w_samples if b_start <= s[0] < b_end]
+        if not b_s:
+            if b_end < oldest_ts:
+                chars.append("█" if (up_cnt == len(w_samples)) else "░")
+            else:
+                chars.append("█")
+        else:
+            b_up = sum(1 for s in b_s if s[1] == 1)
+            b_pct = b_up / len(b_s)
+            if b_pct == 1.0:
+                chars.append("█")
+            elif b_pct >= 0.5:
+                chars.append("▄")
+            else:
+                chars.append(" ")
+    return "".join(chars)
+
+
+def calc_telemetry(samples: list[list], now_ts: int = 0) -> dict:
+    if not now_ts:
+        now_ts = int(time.time())
     # samples: [ts, status (1/0), latency_ms]
     latencies = [s[2] for s in samples if s[1] == 1 and s[2] is not None]
     
@@ -401,10 +440,12 @@ def calc_telemetry(samples: list[list]) -> dict:
         val = -math.log10(unavail)
         nines = f"{val:.2f} nines ({uptime_ratio*100:.2f}%)"
 
+    bar_24h = make_24h_uptime_bar(samples, now_ts, 24)
+
     if not latencies:
         return {
             "p50": None, "p90": None, "p95": None, "p99": None, "min": None, "max": None, "stddev": None,
-            "streak": streak, "streak_hours": streak_hours, "nines": nines,
+            "streak": streak, "streak_hours": streak_hours, "nines": nines, "bar_24h": bar_24h,
             "sparkline_24h": "────────", "histogram": "  No latency data available.", "sample_count": total_count
         }
 
@@ -429,7 +470,7 @@ def calc_telemetry(samples: list[list]) -> dict:
 
     return {
         "p50": p50, "p90": p90, "p95": p95, "p99": p99, "min": min_lat, "max": max_lat, "stddev": stddev,
-        "streak": streak, "streak_hours": streak_hours, "nines": nines,
+        "streak": streak, "streak_hours": streak_hours, "nines": nines, "bar_24h": bar_24h,
         "sparkline_24h": sparkline_24h, "histogram": histogram, "sample_count": total_count
     }
 
@@ -449,7 +490,7 @@ def build_status(results: list[dict], history: dict, now_ts: int, bar_samples: i
     for r in results:
         samples = history["monitors"].get(r["name"], [])
         bar = [s[1] for s in samples[-bar_samples:]]
-        telemetry = calc_telemetry(samples)
+        telemetry = calc_telemetry(samples, now_ts)
 
         monitors_out.append({
             "name": r["name"],
@@ -550,8 +591,9 @@ def render_html(status: dict) -> str:
         u7d_val = f"{m['uptime_7d']}%" if m.get("uptime_7d") is not None else "n/a"
         u30d_val = f"{m['uptime_30d']}%" if m.get("uptime_30d") is not None else "n/a"
         t = m.get("telemetry", {})
+        bar_24h = t.get("bar_24h", "█" * 24)
 
-        summary_line = f"<strong>{name_html}</strong> &middot; {status_badge}"
+        summary_line = f"<strong>{name_html}</strong> &middot; {status_badge} &middot; <code>[{bar_24h}] {u24_val}</code>"
 
         if m["type"] == "heartbeat":
             ht = m.get("host_telemetry") or {}
@@ -579,10 +621,11 @@ Memory Usage:         {mem_val}
 Disk Usage (/):       {disk_val}
 
 === 📊 SRE Availability ===
-Availability (30d):  {t.get('nines', 'n/a')}
-Uptime (24h/7d/30d): {u24_val} / {u7d_val} / {u30d_val}
-Current Streak:      {t.get('streak', 0)} consecutive heartbeats passed (~{t.get('streak_hours', 0)} hours)
-Heartbeats Logged:   {t.get('sample_count', 0)} samples</code></pre>
+24h History (1h/bar): [{bar_24h}] (24h ago ──► now)
+Availability (30d):   {t.get('nines', 'n/a')}
+Uptime (24h/7d/30d):  {u24_val} / {u7d_val} / {u30d_val}
+Current Streak:       {t.get('streak', 0)} consecutive heartbeats passed (~{t.get('streak_hours', 0)} hours)
+Heartbeats Logged:    {t.get('sample_count', 0)} samples</code></pre>
   </details>""")
 
         else:
@@ -604,10 +647,11 @@ Heartbeats Logged:   {t.get('sample_count', 0)} samples</code></pre>
   <details class="myborder" style="margin-bottom: 1em;">
     <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
     <pre><code>=== 📊 SRE & Availability ===
-Availability (30d):  {t.get('nines', 'n/a')}
-Uptime (24h/7d/30d): {u24_val} / {u7d_val} / {u30d_val}
-Current Streak:      {t.get('streak', 0)} consecutive checks passed (~{t.get('streak_hours', 0)} hours)
-Samples Logged:      {t.get('sample_count', 0)} samples
+24h History (1h/bar): [{bar_24h}] (24h ago ──► now)
+Availability (30d):   {t.get('nines', 'n/a')}
+Uptime (24h/7d/30d):  {u24_val} / {u7d_val} / {u30d_val}
+Current Streak:       {t.get('streak', 0)} consecutive checks passed (~{t.get('streak_hours', 0)} hours)
+Samples Logged:       {t.get('sample_count', 0)} samples
 
 === ⏱️ Latency Distribution (ms) ===
 Current Latency:     {current_lat}
