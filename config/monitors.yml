@@ -26,9 +26,9 @@ monitors:
     url: https://roars.dev
     timeout: 10
 
-  - name: CSConfs
+  - name: VietProfs
     type: http
-    url: https://roars.dev/csconfs
+    url: https://vietprofs.roars.dev
     timeout: 10
 
   - name: CSPicks
@@ -36,23 +36,38 @@ monitors:
     url: https://cspicks.roars.dev
     timeout: 10
 
-  # Machines (VPN-only, checked in via scripts/heartbeat.py cron)
-  - name: Taco
-    type: heartbeat
-    slug: taco
+  - name: DIG
+    type: http
+    url: https://dig.roars.dev
+    timeout: 10
 
-  - name: Sushi
-    type: heartbeat
-    slug: sushi
+  - name: BibTeX
+    type: http
+    url: https://bibtex.roars.dev
+    timeout: 10
 
-  - name: Boba
-    type: heartbeat
-    slug: boba
+  - name: Real GMU CS People
+    type: http
+    url: https://realgmucs.github.io/people/
+    timeout: 10
 
-  - name: Pizza
-    type: heartbeat
-    slug: pizza
-
-  - name: Prime
-    type: heartbeat
-    slug: prime
+  # Machines (VPN-only, checked in via scripts/heartbeat.py cron) -- commented out for now
+  # - name: Taco
+  #   type: heartbeat
+  #   slug: taco
+  #
+  # - name: Sushi
+  #   type: heartbeat
+  #   slug: sushi
+  #
+  # - name: Boba
+  #   type: heartbeat
+  #   slug: boba
+  #
+  # - name: Pizza
+  #   type: heartbeat
+  #   slug: pizza
+  #
+  # - name: Prime
+  #   type: heartbeat
+  #   slug: prime
