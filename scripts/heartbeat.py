@@ -81,6 +81,42 @@ def get_system_telemetry() -> dict:
         except Exception:
             pass
 
+    vpn = {}
+    net_dir = "/sys/class/net"
+    if os.path.isdir(net_dir):
+        try:
+            for iface in sorted(os.listdir(net_dir)):
+                if iface.startswith(("wg", "tun", "tailscale", "tap")):
+                    rx_bytes = 0
+                    tx_bytes = 0
+                    stats_dir = os.path.join(net_dir, iface, "statistics")
+                    if os.path.isdir(stats_dir):
+                        try:
+                            with open(os.path.join(stats_dir, "rx_bytes")) as f:
+                                rx_bytes = int(f.read().strip())
+                            with open(os.path.join(stats_dir, "tx_bytes")) as f:
+                                tx_bytes = int(f.read().strip())
+                        except Exception:
+                            pass
+                    
+                    ip_addr = None
+                    try:
+                        out = subprocess.check_output(["ip", "-o", "-4", "addr", "show", iface], text=True, timeout=2)
+                        parts = out.split()
+                        if len(parts) >= 4:
+                            ip_addr = parts[3]
+                    except Exception:
+                        pass
+                    
+                    vpn[iface] = {
+                        "ip": ip_addr,
+                        "rx_gb": round(rx_bytes / (1024**3), 2),
+                        "tx_gb": round(tx_bytes / (1024**3), 2),
+                        "status": "active",
+                    }
+        except Exception:
+            pass
+
     return {
         "uname": uname_str,
         "hostname": hostname,
@@ -89,6 +125,7 @@ def get_system_telemetry() -> dict:
         "cpu_count": cpu_count,
         "disk": disk,
         "mem": mem,
+        "vpn": vpn,
     }
 
 

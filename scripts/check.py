@@ -601,6 +601,15 @@ def render_html(status: dict) -> str:
             uptime_val = ht.get("uptime", "Unknown")
             hostname_val = ht.get("hostname", m["name"])
             
+            vpn_val = ""
+            if ht.get("vpn"):
+                vpn_lines = []
+                for iface, vinfo in ht["vpn"].items():
+                    ip_str = f" ({vinfo['ip']})" if vinfo.get("ip") else ""
+                    rx_tx = f" · RX: {vinfo.get('rx_gb', 0)} GB / TX: {vinfo.get('tx_gb', 0)} GB" if (vinfo.get('rx_gb') or vinfo.get('tx_gb')) else ""
+                    vpn_lines.append(f"{iface}{ip_str} [{vinfo.get('status', 'active')}]{rx_tx}")
+                vpn_val = f"\nVPN / Interfaces: {', '.join(vpn_lines)}"
+
             cpu_val = f"{ht.get('cpu_count', '--')} cores"
             load_val = f"{ht['load'][0]}, {ht['load'][1]}, {ht['load'][2]} ({cpu_val})" if ht.get("load") else "N/A"
             mem_val = f"{ht['mem']['used_gb']} GB / {ht['mem']['total_gb']} GB [{make_bar(ht['mem']['pct'])}] {ht['mem']['pct']}%" if ht.get("mem") else "N/A"
@@ -612,7 +621,7 @@ def render_html(status: dict) -> str:
     <pre><code>=== 🖥️ Host & Kernel Information ===
 Hostname:        {hostname_val}
 Kernel / Uname:  {uname_val}
-System Uptime:   {uptime_val}
+System Uptime:   {uptime_val}{vpn_val}
 Last Heartbeat:  {m.get('message', 'n/a')}
 
 === ⚡ Hardware & Resource Telemetry ===
