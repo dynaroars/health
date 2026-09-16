@@ -15,8 +15,10 @@ import os
 import socket
 import ssl
 import statistics
+import subprocess
 import sys
 import time
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
@@ -164,28 +166,77 @@ def check_tcp(monitor: dict) -> dict:
         }
 
 
+def get_auth_token() -> str | None:
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if token:
+        return token
+    try:
+        res = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, check=False)
+        if res.returncode == 0 and res.stdout.strip():
+            return res.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
 def check_heartbeat(monitor: dict, data_dir: str) -> dict:
     max_age = monitor.get("max_age", DEFAULT_HEARTBEAT_MAX_AGE)
-    path = os.path.join(data_dir, "heartbeats", f"{monitor['slug']}.json")
-    if not os.path.exists(path):
+    slug = monitor["slug"]
+    path = os.path.join(data_dir, "heartbeats", f"{slug}.json")
+    raw = None
+
+    if os.path.exists(path):
+        try:
+            with open(path, "r") as f:
+                raw = json.load(f)
+        except Exception:
+            pass
+    
+    if raw is None:
+        # Fallback to fetching directly from GitHub API (e.g. for local testing)
+        try:
+            repo = os.environ.get("REPO", "dynaroars/health")
+            token = get_auth_token()
+            url = f"https://api.github.com/repos/{repo}/contents/data/heartbeats/{slug}.json?ref=data"
+            headers = {"User-Agent": "roars-check/1.0", "Accept": "application/vnd.github+json"}
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                import base64
+                body = base64.b64decode(json.load(resp)["content"]).decode()
+                raw = json.loads(body)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w") as f:
+                    f.write(body)
+        except Exception:
+            pass
+
+    if not raw or "last_seen" not in raw:
         return {
             "status": "down",
             "latency_ms": None,
             "message": "no heartbeat received yet",
             "server": None,
             "tls": None,
+            "host_telemetry": None,
+            "heartbeat_age_s": None,
         }
+
     try:
-        with open(path, "r") as f:
-            last_seen = datetime.fromisoformat(json.load(f)["last_seen"].replace("Z", "+00:00"))
-    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        last_seen = datetime.fromisoformat(raw["last_seen"].replace("Z", "+00:00"))
+        host_telemetry = raw.get("telemetry")
+    except Exception as e:
         return {
             "status": "down",
             "latency_ms": None,
             "message": f"invalid heartbeat file: {e}",
             "server": None,
             "tls": None,
+            "host_telemetry": None,
+            "heartbeat_age_s": None,
         }
+
     age = (datetime.now(timezone.utc) - last_seen).total_seconds()
     healthy = 0 <= age <= max_age
     return {
@@ -194,6 +245,8 @@ def check_heartbeat(monitor: dict, data_dir: str) -> dict:
         "message": f"last heartbeat {round(age)}s ago" if healthy else f"stale heartbeat ({round(age)}s ago, max {max_age}s)",
         "server": None,
         "tls": None,
+        "host_telemetry": host_telemetry,
+        "heartbeat_age_s": round(age),
     }
 
 
@@ -409,6 +462,8 @@ def build_status(results: list[dict], history: dict, now_ts: int, bar_samples: i
             "message": r["message"],
             "server": r.get("server"),
             "tls": r.get("tls"),
+            "host_telemetry": r.get("host_telemetry"),
+            "heartbeat_age_s": r.get("heartbeat_age_s"),
             "checked_at": iso(now_ts),
             "uptime_24h": uptime_pct(samples, now_ts, UPTIME_WINDOWS["24h"]),
             "uptime_7d": uptime_pct(samples, now_ts, UPTIME_WINDOWS["7d"]),
@@ -452,6 +507,11 @@ def atomic_write_json(path: str, data) -> None:
 # Pure HTML + org.css Renderer (Zero JavaScript)
 # --------------------------------------------------------------------------
 
+def make_bar(pct: float, width: int = 20) -> str:
+    filled = max(0, min(width, int(round((pct / 100.0) * width))))
+    return "█" * filled + "░" * (width - filled)
+
+
 def render_html(status: dict) -> str:
     monitors = status.get("monitors", [])
     incidents = status.get("incidents", [])
@@ -474,43 +534,94 @@ def render_html(status: dict) -> str:
             status_badge = "<strong style='color: #cb4b16;'>Offline</strong>"
 
         name_html = f'<a href="{m["url"]}">{m["name"]}</a>' if m.get("url") else m["name"]
-        latency_str = f"<code>{m['latency_ms']} ms</code>" if m.get("latency_ms") is not None else "<code>--</code>"
         u24 = f"<code>24h: {m['uptime_24h']}%</code>" if m.get("uptime_24h") is not None else "<code>24h: n/a</code>"
         u7d = f"<code>7d: {m['uptime_7d']}%</code>" if m.get("uptime_7d") is not None else "<code>7d: n/a</code>"
         u30d = f"<code>30d: {m['uptime_30d']}%</code>" if m.get("uptime_30d") is not None else "<code>30d: n/a</code>"
-        
         t = m.get("telemetry", {})
-        spark = t.get("sparkline_24h", "────────")
-        p50_p95 = f"<code>p50/p95: {t.get('p50') or '--'}/{t.get('p95') or '--'} ms</code>" if t.get("p50") else ""
 
-        tls = m.get("tls")
-        tls_badge = f"<small>TLS: {tls['days_left']}d left</small>" if tls else ""
+        if m["type"] == "heartbeat":
+            ht = m.get("host_telemetry") or {}
+            load_str = f"<code>Load: {ht['load'][0]}</code>" if ht.get("load") else ""
+            mem_str = f"<code>RAM: {ht['mem']['pct']}%</code>" if ht.get("mem", {}).get("pct") is not None else ""
+            disk_str = f"<code>Disk: {ht['disk']['pct']}%</code>" if ht.get("disk", {}).get("pct") is not None else ""
+            age_str = f"<small>Heartbeat: {m.get('heartbeat_age_s', '--')}s ago</small>" if m.get('heartbeat_age_s') is not None else ""
 
-        target_str = m.get("url") or f"{m.get('host')}:{m.get('port')}" or m.get("name")
-        server_str = m.get("server") or "Unknown"
-        tls_info_str = "None"
-        if tls:
-            tls_info_str = f"{tls['version']} ({tls['cipher']}) | Issuer: {tls['issuer']} | Expires: {tls['expiry']} ({tls['days_left']} days left)"
+            summary_parts = [
+                f"<strong>{name_html}</strong>",
+                status_badge,
+                "<code>machine</code>",
+                u24,
+                u7d,
+                u30d,
+                load_str,
+                mem_str,
+                disk_str,
+                age_str,
+            ]
+            summary_line = " &middot; ".join(p for p in summary_parts if p)
 
-        curl_cmd = f"curl -Iv {m['url']}" if m.get("url") else f"nc -zv {m.get('host')} {m.get('port')}"
+            uname_val = ht.get("uname", "Unknown")
+            uptime_val = ht.get("uptime", "Unknown")
+            hostname_val = ht.get("hostname", m["name"])
+            
+            cpu_val = f"{ht.get('cpu_count', '--')} cores"
+            load_val = f"{ht['load'][0]}, {ht['load'][1]}, {ht['load'][2]} ({cpu_val})" if ht.get("load") else "N/A"
+            mem_val = f"{ht['mem']['used_gb']} GB / {ht['mem']['total_gb']} GB [{make_bar(ht['mem']['pct'])}] {ht['mem']['pct']}%" if ht.get("mem") else "N/A"
+            disk_val = f"{ht['disk']['used_gb']} GB / {ht['disk']['total_gb']} GB [{make_bar(ht['disk']['pct'])}] {ht['disk']['pct']}%" if ht.get("disk") else "N/A"
 
-        stddev_val = t.get('stddev')
-        stddev_str = f"±{stddev_val}ms" if stddev_val is not None else "--"
+            monitor_cards.append(f"""
+  <details class="myborder" style="margin-bottom: 1em;">
+    <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
+    <pre><code>=== Host & Kernel Information ===
+Hostname:        {hostname_val}
+Kernel / Uname:  {uname_val}
+System Uptime:   {uptime_val}
+Last Heartbeat:  {m.get('message', 'n/a')}
 
-        summary_parts = [
-            f"<strong>{name_html}</strong>",
-            status_badge,
-            latency_str,
-            f"<code>{spark}</code>",
-            p50_p95,
-            u24,
-            u7d,
-            u30d,
-            tls_badge,
-        ]
-        summary_line = " &middot; ".join(p for p in summary_parts if p)
+=== Hardware & Resource Telemetry ===
+CPU Load (1m/5m/15m): {load_val}
+Memory Usage:         {mem_val}
+Disk Usage (/):       {disk_val}
 
-        monitor_cards.append(f"""
+=== SRE Availability ===
+Availability (30d): {t.get('nines', 'n/a')}
+Current Streak:     {t.get('streak', 0)} consecutive heartbeats passed (~{t.get('streak_hours', 0)} hours)
+Heartbeats Logged:  {t.get('sample_count', 0)} samples</code></pre>
+  </details>""")
+
+        else:
+            latency_str = f"<code>{m['latency_ms']} ms</code>" if m.get("latency_ms") is not None else "<code>--</code>"
+            spark = t.get("sparkline_24h", "────────")
+            p50_p95 = f"<code>p50/p95: {t.get('p50') or '--'}/{t.get('p95') or '--'} ms</code>" if t.get("p50") else ""
+
+            tls = m.get("tls")
+            tls_badge = f"<small>TLS: {tls['days_left']}d left</small>" if tls else ""
+
+            target_str = m.get("url") or f"{m.get('host')}:{m.get('port')}" or m.get("name")
+            server_str = m.get("server") or "Unknown"
+            tls_info_str = "None"
+            if tls:
+                tls_info_str = f"{tls['version']} ({tls['cipher']}) | Issuer: {tls['issuer']} | Expires: {tls['expiry']} ({tls['days_left']} days left)"
+
+            curl_cmd = f"curl -Iv {m['url']}" if m.get("url") else f"nc -zv {m.get('host')} {m.get('port')}"
+
+            stddev_val = t.get('stddev')
+            stddev_str = f"±{stddev_val}ms" if stddev_val is not None else "--"
+
+            summary_parts = [
+                f"<strong>{name_html}</strong>",
+                status_badge,
+                latency_str,
+                f"<code>{spark}</code>",
+                p50_p95,
+                u24,
+                u7d,
+                u30d,
+                tls_badge,
+            ]
+            summary_line = " &middot; ".join(p for p in summary_parts if p)
+
+            monitor_cards.append(f"""
   <details class="myborder" style="margin-bottom: 1em;">
     <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
     <pre><code>=== SRE & Availability ===

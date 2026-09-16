@@ -51,7 +51,11 @@ monitors:
     url: https://realgmucs.github.io/people/
     timeout: 10
 
-  # Machines (VPN-only, checked in via scripts/heartbeat.py cron) -- commented out for now
+  # Machines (Heartbeat monitors)
+  - name: Prime
+    type: heartbeat
+    slug: prime
+
   # - name: Taco
   #   type: heartbeat
   #   slug: taco
@@ -67,7 +71,3 @@ monitors:
   # - name: Pizza
   #   type: heartbeat
   #   slug: pizza
-  #
-  # - name: Prime
-  #   type: heartbeat
-  #   slug: prime
