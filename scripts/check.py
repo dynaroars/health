@@ -593,7 +593,7 @@ def render_html(status: dict) -> str:
         t = m.get("telemetry", {})
         bar_24h = t.get("bar_24h", "█" * 24)
 
-        summary_line = f"<strong>{name_html}</strong> &middot; {status_badge} &middot; <code>[{bar_24h}] {u24_val}</code>"
+        summary_line = f"<strong>{name_html}</strong> &middot; {status_badge} &middot; <code>24h: [24h ago {bar_24h} now] {u24_val}</code>"
 
         if m["type"] == "heartbeat":
             ht = m.get("host_telemetry") or {}
@@ -621,11 +621,11 @@ Memory Usage:         {mem_val}
 Disk Usage (/):       {disk_val}
 
 === 📊 SRE Availability ===
-24h History (1h/bar): [{bar_24h}] (24h ago ──► now)
-Availability (30d):   {t.get('nines', 'n/a')}
-Uptime (24h/7d/30d):  {u24_val} / {u7d_val} / {u30d_val}
-Current Streak:       {t.get('streak', 0)} consecutive heartbeats passed (~{t.get('streak_hours', 0)} hours)
-Heartbeats Logged:    {t.get('sample_count', 0)} samples</code></pre>
+24h History (24h ago ──► now): [{bar_24h}] ({u24_val} operational)
+Availability (30d):            {t.get('nines', 'n/a')}
+Uptime (24h/7d/30d):           {u24_val} / {u7d_val} / {u30d_val}
+Current Streak:                {t.get('streak', 0)} consecutive heartbeats passed (~{t.get('streak_hours', 0)} hours)
+Heartbeats Logged:             {t.get('sample_count', 0)} samples</code></pre>
   </details>""")
 
         else:
@@ -647,24 +647,24 @@ Heartbeats Logged:    {t.get('sample_count', 0)} samples</code></pre>
   <details class="myborder" style="margin-bottom: 1em;">
     <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
     <pre><code>=== 📊 SRE & Availability ===
-24h History (1h/bar): [{bar_24h}] (24h ago ──► now)
-Availability (30d):   {t.get('nines', 'n/a')}
-Uptime (24h/7d/30d):  {u24_val} / {u7d_val} / {u30d_val}
-Current Streak:       {t.get('streak', 0)} consecutive checks passed (~{t.get('streak_hours', 0)} hours)
-Samples Logged:       {t.get('sample_count', 0)} samples
+24h History (24h ago ──► now): [{bar_24h}] ({u24_val} operational)
+Availability (30d):            {t.get('nines', 'n/a')}
+Uptime (24h/7d/30d):           {u24_val} / {u7d_val} / {u30d_val}
+Current Streak:                {t.get('streak', 0)} consecutive checks passed (~{t.get('streak_hours', 0)} hours)
+Samples Logged:                {t.get('sample_count', 0)} samples
 
 === ⏱️ Latency Distribution (ms) ===
-Current Latency:     {current_lat}
+Current Latency:               {current_lat}
 min: {t.get('min') or '--'}ms | p50: {t.get('p50') or '--'}ms | p90: {t.get('p90') or '--'}ms | p95: {t.get('p95') or '--'}ms | p99: {t.get('p99') or '--'}ms | max: {t.get('max') or '--'}ms | σ: {stddev_str}
-Sparkline (24h):     {spark}
+Sparkline (24h):               {spark}
 
 === 📈 Latency Histogram ===
 {t.get('histogram', '  No data')}
 
 === 🔒 TLS & Edge Fingerprint ===
-HTTP Status:         {m.get('message', 'n/a')}
-Server Header:       {server_str}
-TLS Details:         {tls_info_str}
+HTTP Status:                   {m.get('message', 'n/a')}
+Server Header:                 {server_str}
+TLS Details:                   {tls_info_str}
 
 === 🛠️ Diagnostic CLI ===
 {curl_cmd}</code></pre>
@@ -715,6 +715,7 @@ TLS Details:         {tls_info_str}
   </blockquote>
 
   <h2>Monitors</h2>
+  <p><small>24-hour timeline (1 segment = 1 hour &middot; █ 100% up &middot; ▄ degraded &middot; &nbsp; outage)</small></p>
 {cards_html}
 {incidents_html}
   <hr>
