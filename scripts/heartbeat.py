@@ -25,8 +25,28 @@ BRANCH = "data"
 DEFAULT_REPO = "dynaroars/health"
 
 
+def get_os_summary() -> str:
+    machine = platform.machine()
+    distro = ""
+    if os.path.exists("/etc/os-release"):
+        try:
+            with open("/etc/os-release") as f:
+                for line in f:
+                    if line.startswith("PRETTY_NAME="):
+                        distro = line.split("=", 1)[1].strip().strip('"')
+                        break
+                    elif line.startswith("NAME=") and not distro:
+                        distro = line.split("=", 1)[1].strip().strip('"')
+        except Exception:
+            pass
+    if distro:
+        name = distro.split()[0].replace("GNU/", "").strip()
+        return f"{name} Linux ({machine})"
+    return f"{platform.system()} ({machine})"
+
+
 def get_system_telemetry() -> dict:
-    uname_str = " ".join(platform.uname())
+    os_str = get_os_summary()
     hostname = platform.node()
     cpu_count = os.cpu_count() or 1
     
@@ -99,26 +119,16 @@ def get_system_telemetry() -> dict:
                         except Exception:
                             pass
                     
-                    ip_addr = None
-                    try:
-                        out = subprocess.check_output(["ip", "-o", "-4", "addr", "show", iface], text=True, timeout=2)
-                        parts = out.split()
-                        if len(parts) >= 4:
-                            ip_addr = parts[3]
-                    except Exception:
-                        pass
-                    
                     vpn[iface] = {
-                        "ip": ip_addr,
                         "rx_gb": round(rx_bytes / (1024**3), 2),
                         "tx_gb": round(tx_bytes / (1024**3), 2),
-                        "status": "active",
+                        "status": "connected",
                     }
         except Exception:
             pass
 
     return {
-        "uname": uname_str,
+        "os": os_str,
         "hostname": hostname,
         "uptime": uptime_str,
         "load": load_avg,

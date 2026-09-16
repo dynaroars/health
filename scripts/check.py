@@ -597,7 +597,20 @@ def render_html(status: dict) -> str:
 
         if m["type"] == "heartbeat":
             ht = m.get("host_telemetry") or {}
-            uname_val = ht.get("uname", "Unknown")
+            
+            if ht.get("os"):
+                os_val = ht["os"]
+            elif ht.get("uname"):
+                uname_lower = ht["uname"].lower()
+                if "debian" in uname_lower:
+                    os_val = "Debian Linux (x86_64)"
+                elif "ubuntu" in uname_lower:
+                    os_val = "Ubuntu Linux (x86_64)"
+                else:
+                    os_val = "Linux (x86_64)"
+            else:
+                os_val = "Linux (x86_64)"
+
             uptime_val = ht.get("uptime", "Unknown")
             hostname_val = ht.get("hostname", m["name"])
             
@@ -605,10 +618,10 @@ def render_html(status: dict) -> str:
             if ht.get("vpn"):
                 vpn_lines = []
                 for iface, vinfo in ht["vpn"].items():
-                    ip_str = f" ({vinfo['ip']})" if vinfo.get("ip") else ""
+                    vname = "WireGuard" if iface.startswith("wg") else ("Tailscale" if iface.startswith("tailscale") else "VPN")
                     rx_tx = f" · RX: {vinfo.get('rx_gb', 0)} GB / TX: {vinfo.get('tx_gb', 0)} GB" if (vinfo.get('rx_gb') or vinfo.get('tx_gb')) else ""
-                    vpn_lines.append(f"{iface}{ip_str} [{vinfo.get('status', 'active')}]{rx_tx}")
-                vpn_val = f"\nVPN / Interfaces: {', '.join(vpn_lines)}"
+                    vpn_lines.append(f"{vname} ({iface}) [{vinfo.get('status', 'connected')}]{rx_tx}")
+                vpn_val = f"\nVPN / Network:   {', '.join(vpn_lines)}"
 
             cpu_val = f"{ht.get('cpu_count', '--')} cores"
             load_val = f"{ht['load'][0]}, {ht['load'][1]}, {ht['load'][2]} ({cpu_val})" if ht.get("load") else "N/A"
@@ -618,9 +631,9 @@ def render_html(status: dict) -> str:
             monitor_cards.append(f"""
   <details class="myborder" style="margin-bottom: 1em;">
     <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
-    <pre><code>=== 🖥️ Host & Kernel Information ===
+    <pre><code>=== 🖥️ Host & Platform Information ===
 Hostname:        {hostname_val}
-Kernel / Uname:  {uname_val}
+Platform / OS:   {os_val}
 System Uptime:   {uptime_val}{vpn_val}
 Last Heartbeat:  {m.get('message', 'n/a')}
 
