@@ -593,7 +593,7 @@ def render_html(status: dict) -> str:
         t = m.get("telemetry", {})
         bar_24h = t.get("bar_24h", "█" * 24)
 
-        summary_line = f"<strong>{name_html}</strong> &middot; {status_badge} &middot; <code>24h: [24h ago {bar_24h} now] {u24_val}</code>"
+        summary_line = f"<strong>{name_html}</strong> &middot; {status_badge} &middot; <code>[24h ago {bar_24h} now] {u24_val}</code>"
 
         if m["type"] == "heartbeat":
             ht = m.get("host_telemetry") or {}
