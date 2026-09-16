@@ -282,6 +282,110 @@ def atomic_write_json(path: str, data) -> None:
 
 
 # --------------------------------------------------------------------------
+# HTML rendering (Pure HTML + org.css, zero JavaScript)
+# --------------------------------------------------------------------------
+
+def render_html(status: dict) -> str:
+    monitors = status.get("monitors", [])
+    incidents = status.get("incidents", [])
+    overall = status.get("overall", "operational")
+
+    if overall == "operational":
+        overall_msg = "<strong>All systems operational</strong>"
+    elif overall == "outage":
+        overall_msg = "<strong>Major outage</strong> &mdash; all monitored services are down"
+    else:
+        overall_msg = "<strong>Degraded performance / partial outage</strong>"
+
+    rows = []
+    for m in monitors:
+        status_str = m["status"]
+        if status_str == "up":
+            status_html = "<span>Operational</span>"
+        else:
+            status_html = "<strong>Offline</strong>"
+
+        latency = f"{m['latency_ms']} ms" if m.get("latency_ms") is not None else "--"
+        u24 = f"{m['uptime_24h']}%" if m.get("uptime_24h") is not None else "n/a"
+        u7d = f"{m['uptime_7d']}%" if m.get("uptime_7d") is not None else "n/a"
+        u30d = f"{m['uptime_30d']}%" if m.get("uptime_30d") is not None else "n/a"
+        message = m.get("message") or ""
+
+        rows.append(
+            f"      <tr>\n"
+            f"        <td><strong>{m['name']}</strong></td>\n"
+            f"        <td><code>{m['type']}</code></td>\n"
+            f"        <td>{status_html}</td>\n"
+            f"        <td>{latency}</td>\n"
+            f"        <td>{u24}</td>\n"
+            f"        <td>{u7d}</td>\n"
+            f"        <td>{u30d}</td>\n"
+            f"        <td><small>{message}</small></td>\n"
+            f"      </tr>"
+        )
+
+    table_rows = "\n".join(rows) if rows else "      <tr><td colspan='8'>No monitors configured.</td></tr>"
+
+    incidents_html = ""
+    if incidents:
+        inc_items = []
+        for inc in incidents:
+            ongoing = inc.get("end") is None
+            if ongoing:
+                time_str = f"since {inc['start']} (ongoing)"
+            else:
+                time_str = f"{inc['start']} &ndash; {inc['end']} ({inc['duration_min']} min)"
+            inc_items.append(f"    <li><strong>{inc['monitor']}</strong> &mdash; {time_str}</li>")
+        incidents_list = "\n".join(inc_items)
+        incidents_html = f"""
+  <h2>Recent Incidents</h2>
+  <ul>
+{incidents_list}
+  </ul>
+"""
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="300">
+  <title>ROARS Status</title>
+  <link rel="stylesheet" type="text/css" href="files/org.css">
+</head>
+<body>
+  <h1>ROARS Status</h1>
+
+  <blockquote>
+    {overall_msg} &mdash; checks run every 5 minutes via GitHub Actions.
+  </blockquote>
+
+  <h2>Services &amp; Machines</h2>
+  <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+    <thead>
+      <tr style="text-align: left;">
+        <th>Monitor</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Latency</th>
+        <th>24h</th>
+        <th>7d</th>
+        <th>30d</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+{table_rows}
+    </tbody>
+  </table>
+{incidents_html}
+  <p><small>Automatically updated every 5 minutes &middot; Pure HTML &amp; CSS</small></p>
+</body>
+</html>
+"""
+
+
+# --------------------------------------------------------------------------
 # Main
 # --------------------------------------------------------------------------
 
@@ -289,6 +393,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="config/monitors.yml")
     parser.add_argument("--data-dir", default="data")
+    parser.add_argument("--html-out", default="index.html", help="Path to write rendered static index.html")
     parser.add_argument("--retention-days", type=int, default=RETENTION_DAYS_DEFAULT)
     parser.add_argument("--bar-samples", type=int, default=BAR_SAMPLES_DEFAULT)
     parser.add_argument("--incident-limit", type=int, default=INCIDENT_LIMIT_DEFAULT)
@@ -309,10 +414,21 @@ def main() -> int:
     status = build_status(results, history, now_ts, args.bar_samples, args.incident_limit)
     atomic_write_json(os.path.join(args.data_dir, "status.json"), status)
 
+    if args.html_out:
+        html_dir = os.path.dirname(args.html_out)
+        if html_dir:
+            os.makedirs(html_dir, exist_ok=True)
+        html_content = render_html(status)
+        tmp_html = f"{args.html_out}.tmp"
+        with open(tmp_html, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        os.replace(tmp_html, args.html_out)
+
     up = sum(1 for r in results if r["status"] == "up")
     print(f"checked {len(results)} monitor(s): {up} up, {len(results) - up} down")
     for r in results:
-        print(f"  [{r['status']:>4}] {r['name']:<30} {r['latency_ms']}ms  {r['message']}")
+        lat_str = f"{r['latency_ms']:>4}ms" if r["latency_ms"] is not None else "      "
+        print(f"  [{r['status']:>4}] {r['name']:<30} {lat_str}  {r['message']}")
 
     return 0
 

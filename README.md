@@ -9,10 +9,11 @@ a heartbeat to GitHub themselves.
 ```
 GitHub Actions (every 5 min)                    VPN-only machines
   -> scripts/check.py (http/tcp checks)            -> scripts/heartbeat.py (cron)
+  -> renders pure HTML (index.html)                       |
                                                           |
-  -> data branch (history.json)  <-----------------------+  writes data/heartbeats/<slug>.json
+  -> data branch (history.json)  <------------------------+  writes data/heartbeats/<slug>.json
   -> data branch (status.json)      via GitHub Contents API, no inbound access needed
-  -> GitHub Pages (via Actions)  site/ + data/*.json, deployed as an artifact
+  -> GitHub Pages (via Actions)  index.html + files/org.css
 ```
 
 ## Why a separate `data` branch?
@@ -56,12 +57,10 @@ between the workflow's fetch and its push) before being relied on.
 ```
 .github/workflows/monitor.yml   the one workflow: check -> commit -> deploy
 config/monitors.yml             monitors to check (edit this to add/remove machines)
-scripts/check.py                the checker (stdlib + PyYAML only)
+files/org.css                   single stylesheet (pure CSS, light/dark themes)
+scripts/check.py                the checker & pure HTML generator (stdlib + PyYAML only)
 scripts/heartbeat.py            run via cron ON a VPN-only machine to report it's alive
 scripts/requirements.txt        just PyYAML
-site/index.html                 dashboard markup
-site/style.css                  dark, old-school, responsive styling
-site/app.js                     fetches data/status.json and renders it
 README.md                       this file
 ```
 
@@ -166,16 +165,16 @@ just wait for the next cron tick.
    worktree — creating `data` as an orphan branch on the very first run.
 2. Runs `scripts/check.py`, which checks every monitor concurrently, appends
    one sample per monitor to `history.json`, prunes samples older than the
-   retention window, and writes the latest `status.json` snapshot.
+   retention window, and generates `index.html`.
 3. Commits the updated `data/` files to the `data` branch (skipped if
    nothing changed, which won't normally happen since `checked_at` always
    changes, but the check exists for safety). If the push is rejected
    because a heartbeat commit (see below) landed on `data` in the meantime,
    it fetches, rebases, and retries (up to 3 times) instead of failing.
-4. Assembles `site/*` + the freshly generated `data/*.json` into `dist/` and
-   deploys it to GitHub Pages via `actions/upload-pages-artifact` +
-   `actions/deploy-pages` — the current recommended approach, which deploys
-   from a build artifact instead of pushing rendered HTML into a branch.
+4. Assembles `index.html` + `files/org.css` and deploys it to GitHub Pages
+   via `actions/upload-pages-artifact` + `actions/deploy-pages` — the current
+   recommended approach, which deploys from a build artifact instead of
+   pushing rendered HTML into a branch.
 
 A `concurrency: group: status-monitor` block serializes runs so two
 overlapping executions (e.g. a manual run firing right as the scheduled one
@@ -200,14 +199,11 @@ To serve this at `uptime.roars.dev` or `status.roars.dev`:
 python3 -m venv .venv && source .venv/bin/activate.fish   # or activate for bash
 pip install -r scripts/requirements.txt
 
-# run one check cycle against a local data/ directory
-python scripts/check.py --config config/monitors.yml --data-dir data
+# run one check cycle (generates index.html in the main directory)
+python scripts/check.py
 
-# assemble and serve the dashboard exactly like the deployed site
-mkdir -p dist/data
-cp site/*.html site/*.css site/*.js dist/
-cp data/*.json dist/data/
-cd dist && python3 -m http.server 8000
+# open directly in browser or serve locally
+python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
@@ -216,8 +212,8 @@ samples to see the uptime bar and percentages populate.
 
 ## Security
 
-- No credentials are embedded in the frontend — `site/app.js` only ever
-  fetches the already-public `data/status.json`.
+- Zero JavaScript on the frontend — the site serves pure static HTML and
+  [files/org.css](files/org.css).
 - Checks are unauthenticated HTTP/TCP only. If you later need authenticated
   checks (an API key in a header, etc.), pass them into `check.py` via
   `${{ secrets.SOME_TOKEN }}` in the workflow's `env:`, read them with
@@ -246,3 +242,4 @@ samples to see the uptime bar and percentages populate.
 - IPv4/IPv6 dual-stack, DNS-round-robin, and geographically distributed
   checks aren't supported — checks run from wherever the GitHub Actions
   runner happens to be.
+

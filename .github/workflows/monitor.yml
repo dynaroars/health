@@ -71,14 +71,14 @@ jobs:
 
       - name: Assemble Pages site
         run: |
-          mkdir -p dist/data
-          cp site/index.html site/style.css site/app.js dist/
-          cp data-branch/data/status.json data-branch/data/history.json dist/data/
+          mkdir -p _site/files
+          cp index.html _site/
+          cp files/org.css _site/files/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: _site
 
   deploy:
     needs: check
