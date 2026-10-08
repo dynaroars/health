@@ -68,7 +68,14 @@ fi
 # --- cron (idempotent) ---
 py="$(command -v python3)"
 line="*/5 * * * * set -a; . $ENV_FILE; set +a; $py $SCRIPT $slug >> $LOG 2>&1 $MARK"
-( crontab -l 2>/dev/null | grep -vF "$MARK" || true; echo "$line" ) | crontab -
+current="$(crontab -l 2>/dev/null || true)"
+# drop our previous entry and any legacy heartbeat.py entries (avoids duplicates)
+legacy="$(printf '%s\n' "$current" | grep -E 'heartbeat\.py|stats-heartbeat' || true)"
+if [ -n "$legacy" ]; then
+  echo "Removing old heartbeat cron entries:"
+  printf '%s\n' "$legacy" | sed -E 's/(github_pat_[A-Za-z0-9_]{6})[A-Za-z0-9_]+/\1...[redacted]/g; s/^/  /'
+fi
+( printf '%s\n' "$current" | grep -vE 'heartbeat\.py|stats-heartbeat' | grep -vF "$MARK" || true; echo "$line" ) | crontab -
 
 echo "Installed cron job (every 5 min), log: $LOG"
 echo
