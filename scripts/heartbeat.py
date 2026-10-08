@@ -14,9 +14,11 @@ import base64
 import json
 import os
 import platform
+import random
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -188,37 +190,48 @@ def main() -> int:
         "User-Agent": "roars-heartbeat/1.0",
     }
 
-    sha = None
-    try:
-        req = urllib.request.Request(f"{api_url}?ref={BRANCH}", headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            sha = json.load(resp)["sha"]
-    except urllib.error.HTTPError as e:
-        if e.code != 404:
-            raise
-
     telemetry = get_system_telemetry()
     payload_body = {
         "last_seen": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "telemetry": telemetry,
     }
     body_bytes = json.dumps(payload_body, indent=2).encode()
-    payload = {
-        "message": f"heartbeat: {slug}",
-        "content": base64.b64encode(body_bytes).decode(),
-        "branch": BRANCH,
-    }
-    if sha:
-        payload["sha"] = sha
 
-    req = urllib.request.Request(
-        api_url,
-        data=json.dumps(payload).encode(),
-        headers={**headers, "Content-Type": "application/json"},
-        method="PUT",
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        resp.read()
+    # Every machine writes to the same branch, so concurrent PUTs can be
+    # rejected with 409/422 (stale sha / branch moved). Retry with jitter.
+    attempts = 6
+    for attempt in range(attempts):
+        sha = None
+        try:
+            req = urllib.request.Request(f"{api_url}?ref={BRANCH}", headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                sha = json.load(resp)["sha"]
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                raise
+
+        payload = {
+            "message": f"heartbeat: {slug}",
+            "content": base64.b64encode(body_bytes).decode(),
+            "branch": BRANCH,
+        }
+        if sha:
+            payload["sha"] = sha
+
+        req = urllib.request.Request(
+            api_url,
+            data=json.dumps(payload).encode(),
+            headers={**headers, "Content-Type": "application/json"},
+            method="PUT",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                resp.read()
+            break
+        except urllib.error.HTTPError as e:
+            if e.code not in (409, 422) or attempt == attempts - 1:
+                raise
+            time.sleep(random.uniform(1, 4) * (attempt + 1))
     print(f"heartbeat pushed for {slug} (load: {telemetry.get('load')}, uptime: {telemetry.get('uptime')})")
     return 0
 
