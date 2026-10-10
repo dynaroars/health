@@ -557,6 +557,34 @@ def make_bar(pct: float, width: int = 20) -> str:
     return "█" * filled + "░" * (width - filled)
 
 
+def format_load_status(load: list[float] | None, cpu_count: int | None) -> tuple[str, str]:
+    if not load or not cpu_count:
+        return ("", "")
+    load1 = load[0]
+    cores = max(1, cpu_count)
+    pct = round((load1 / cores) * 100)
+    if pct <= 30:
+        cat = "idle"
+        desc = "idle / low workload"
+        style = "opacity: 0.8; font-weight: normal;"
+    elif pct <= 70:
+        cat = "normal"
+        desc = "normal workload, ample headroom"
+        style = "opacity: 0.8; font-weight: normal;"
+    elif pct <= 100:
+        cat = "busy"
+        desc = "heavy workload, near core capacity"
+        style = "color: #b58900; font-weight: bold;"
+    else:
+        cat = "overloaded"
+        desc = "overloaded, tasks queuing"
+        style = "color: #cb4b16; font-weight: bold;"
+
+    summary_html = f" <small style='{style}'>({pct}% load &middot; {cat})</small>"
+    detail_str = f"~{pct}% capacity ({desc})"
+    return (summary_html, detail_str)
+
+
 def render_html(status: dict) -> str:
     monitors = status.get("monitors", [])
     incidents = status.get("incidents", [])
@@ -609,9 +637,18 @@ def render_html(status: dict) -> str:
             t = m.get("telemetry", {})
             bar_24h = t.get("bar_24h", "█" * 24)
 
+            extra_metric = ""
+            load_detail = ""
+            if m_type == "heartbeat":
+                ht = m.get("host_telemetry") or {}
+                load_badge, load_detail = format_load_status(ht.get("load"), ht.get("cpu_count"))
+                extra_metric = load_badge
+            elif m.get("latency_ms") is not None:
+                extra_metric = f" <small style='opacity: 0.8; font-weight: normal;'>({m['latency_ms']}ms)</small>"
+
             summary_line = (
                 f"<strong>{name_html}</strong>{desc_badge}"
-                f"<span class=\"health-stats\">{status_badge} &middot; <code>[24h ago {bar_24h} now] {u24_val}</code></span>"
+                f"<span class=\"health-stats\">{status_badge}{extra_metric} &middot; <code>[24h ago {bar_24h} now] {u24_val}</code></span>"
             )
 
             if m["type"] == "heartbeat":
@@ -643,7 +680,8 @@ def render_html(status: dict) -> str:
                     vpn_val = f"\nVPN / Network:   {', '.join(vpn_lines)}"
 
                 cpu_val = f"{ht.get('cpu_count', '--')} cores"
-                load_val = f"{ht['load'][0]}, {ht['load'][1]}, {ht['load'][2]} ({cpu_val})" if ht.get("load") else "N/A"
+                load_expl = f" — {load_detail}" if load_detail else ""
+                load_val = f"{ht['load'][0]}, {ht['load'][1]}, {ht['load'][2]} ({cpu_val}){load_expl}" if ht.get("load") else "N/A"
                 mem_val = f"{ht['mem']['used_gb']} GB / {ht['mem']['total_gb']} GB [{make_bar(ht['mem']['pct'])}] {ht['mem']['pct']}%" if ht.get("mem") else "N/A"
                 disk_val = f"{ht['disk']['used_gb']} GB / {ht['disk']['total_gb']} GB [{make_bar(ht['disk']['pct'])}] {ht['disk']['pct']}%" if ht.get("disk") else "N/A"
 
