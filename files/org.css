@@ -60,6 +60,10 @@ details > summary {
   border: 2px dotted transparent;
 }
 
+.health-stats {
+  float: right;
+}
+
 @media (max-width: 600px) {
   h1 {
     font-size: 1.6em;
@@ -71,6 +75,11 @@ details > summary {
 
   header {
     padding-right: 45vw;
+  }
+
+  .health-stats {
+    float: none;
+    display: block;
   }
 }
 
