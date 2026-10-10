@@ -557,6 +557,20 @@ def make_bar(pct: float, width: int = 20) -> str:
     return "█" * filled + "░" * (width - filled)
 
 
+def format_age(seconds: int | None) -> str:
+    if seconds is None:
+        return "n/a"
+    if seconds < 60:
+        return f"{seconds}s ago"
+    minutes = seconds // 60
+    if minutes < 60:
+        rem_sec = seconds % 60
+        return f"{minutes}m {rem_sec}s ago" if rem_sec and minutes < 5 else f"{minutes}m ago"
+    hours = minutes // 60
+    rem_min = minutes % 60
+    return f"{hours}h {rem_min}m ago"
+
+
 def render_html(status: dict) -> str:
     monitors = status.get("monitors", [])
     incidents = status.get("incidents", [])
@@ -583,7 +597,7 @@ def render_html(status: dict) -> str:
         for m in gmonitors:
             status_str = m["status"]
             if status_str == "up":
-                status_badge = "<span>🟢 Operational</span>"
+                status_badge = "<span style='color: #2e7d32; font-weight: bold;'>🟢 Operational</span>"
             else:
                 status_badge = "<strong style='color: #cb4b16;'>🔴 Offline</strong>"
 
@@ -609,7 +623,21 @@ def render_html(status: dict) -> str:
             t = m.get("telemetry", {})
             bar_24h = t.get("bar_24h", "█" * 24)
 
-            summary_line = f"<strong>{name_html}</strong>{desc_badge} &middot; {status_badge} &middot; <code>[24h ago {bar_24h} now] {u24_val}</code>"
+            # Extra quick status context (e.g. latency or heartbeat age)
+            extra_metric = ""
+            if m_type == "heartbeat":
+                hb_age = m.get("heartbeat_age_s")
+                if hb_age is not None:
+                    extra_metric = f" <small style='opacity:0.8;'>({format_age(hb_age)})</small>"
+            elif m.get("latency_ms") is not None:
+                extra_metric = f" <small style='opacity:0.8;'>({m['latency_ms']}ms)</small>"
+
+            summary_line = (
+                f"<div style='display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.5em; width: 100%;'>"
+                f"<span><strong>{name_html}</strong>{desc_badge}</span>"
+                f"<span>{status_badge}{extra_metric} &middot; <code title='24h timeline (left: 24h ago, right: now)'>[{bar_24h}] {u24_val}</code></span>"
+                f"</div>"
+            )
 
             if m["type"] == "heartbeat":
                 ht = m.get("host_telemetry") or {}
@@ -643,16 +671,17 @@ def render_html(status: dict) -> str:
                 load_val = f"{ht['load'][0]}, {ht['load'][1]}, {ht['load'][2]} ({cpu_val})" if ht.get("load") else "N/A"
                 mem_val = f"{ht['mem']['used_gb']} GB / {ht['mem']['total_gb']} GB [{make_bar(ht['mem']['pct'])}] {ht['mem']['pct']}%" if ht.get("mem") else "N/A"
                 disk_val = f"{ht['disk']['used_gb']} GB / {ht['disk']['total_gb']} GB [{make_bar(ht['disk']['pct'])}] {ht['disk']['pct']}%" if ht.get("disk") else "N/A"
+                hb_age_str = format_age(m.get("heartbeat_age_s"))
 
                 group_cards.append(f"""
-  <details class="myborder" style="margin-bottom: 1em;">
-    <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
+  <details class="myborder" style="margin-bottom: 0.8em;">
+    <summary style="padding: 6px 0;">{summary_line}</summary>
     <pre><code>=== 🖥️ Host & Platform Information ===
 Description:     {desc_str or 'n/a'}
 Hostname:        {hostname_val}
 Platform / OS:   {os_val}
 System Uptime:   {uptime_val}{vpn_val}
-Last Heartbeat:  {m.get('message', 'n/a')}
+Last Heartbeat:  {m.get('message', 'n/a')} ({hb_age_str})
 
 === ⚡ Hardware & Resource Telemetry ===
 CPU Load (1m/5m/15m): {load_val}
@@ -683,8 +712,8 @@ Heartbeats Logged:             {t.get('sample_count', 0)} samples</code></pre>
                 current_lat = f"{m['latency_ms']} ms" if m.get("latency_ms") is not None else "--"
 
                 group_cards.append(f"""
-  <details class="myborder" style="margin-bottom: 1em;">
-    <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
+  <details class="myborder" style="margin-bottom: 0.8em;">
+    <summary style="padding: 6px 0;">{summary_line}</summary>
     <pre><code>=== 📊 SRE & Availability ===
 24h History (24h ago ──► now): [{bar_24h}] ({u24_val} operational)
 Availability (30d):            {t.get('nines', 'n/a')}
@@ -754,21 +783,54 @@ TLS Details:                   {tls_info_str}
   <link rel="stylesheet" type="text/css" href="files/org.css">
 </head>
 <body>
-  <h1><a href="https://roars.dev">ROARS</a> Status</h1>
+  <header>
+    <h1><a href="https://roars.dev">ROARS</a> Status</h1>
+  </header>
 
   <blockquote>
     {overall_msg} &mdash; checks run every 5 minutes via GitHub Actions. Click any service below for telemetry and diagnostics.
   </blockquote>
 
-  <h2>Monitors</h2>
+  <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 1em; margin-top: 1.5em;">
+    <h2 style="margin: 0;">Monitors</h2>
+    <div>
+      <button type="button" id="toggle-all" style="cursor: pointer; padding: 2px 8px; font-size: 0.85em;">Expand all</button>
+    </div>
+  </div>
   <p><small>24-hour timeline (1 segment = 1 hour &middot; █ 100% up &middot; ▄ degraded &middot; &nbsp; outage)</small></p>
 {cards_html}
 {incidents_html}
   <hr>
-  <p><small>Last updated: <time id="last-updated" datetime="{iso_str}">{fallback_str}</time></small></p>
+  <p style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1em;">
+    <small>Last updated: <time id="last-updated" datetime="{iso_str}">{fallback_str}</time></small>
+    <small id="refresh-counter">Auto-refreshes in 5m</small>
+  </p>
   <script>
     const el = document.getElementById("last-updated");
     if (el) el.textContent = new Date(el.dateTime).toLocaleString();
+
+    // Toggle expand/collapse all details
+    const toggleBtn = document.getElementById("toggle-all");
+    if (toggleBtn) {{
+      toggleBtn.addEventListener("click", () => {{
+        const allDetails = document.querySelectorAll("details.myborder");
+        const anyClosed = Array.from(allDetails).some(d => !d.open);
+        allDetails.forEach(d => {{ d.open = anyClosed; }});
+        toggleBtn.textContent = anyClosed ? "Collapse all" : "Expand all";
+      }});
+    }}
+
+    // Subtle countdown timer
+    let remainingSec = 300;
+    const counter = document.getElementById("refresh-counter");
+    if (counter) {{
+      setInterval(() => {{
+        remainingSec = Math.max(0, remainingSec - 1);
+        const m = Math.floor(remainingSec / 60);
+        const s = remainingSec % 60;
+        counter.textContent = `Auto-refreshes in ${{m}}m ${{s < 10 ? '0' : ''}}${{s}}s`;
+      }}, 1000);
+    }}
   </script>
 </body>
 </html>
