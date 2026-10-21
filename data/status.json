@@ -1,5 +1,5 @@
 {
-  "updated":"2026-10-21T20:06:11Z",
+  "updated":"2026-10-21T20:24:01Z",
   "overall":"degraded",
   "monitors":[
     {
@@ -11,7 +11,7 @@
       "host":null,
       "port":null,
       "status":"up",
-      "latency_ms":280,
+      "latency_ms":503,
       "message":"HTTP 200",
       "server":"cloudflare",
       "tls":{
@@ -23,7 +23,7 @@
       },
       "host_telemetry":null,
       "heartbeat_age_s":null,
-      "checked_at":"2026-10-21T20:06:11Z",
+      "checked_at":"2026-10-21T20:24:01Z",
       "uptime_24h":100.0,
       "uptime_7d":100.0,
       "uptime_30d":100.0,
@@ -82,17 +82,17 @@
       "telemetry":{
         "p50":300,
         "p90":410,
-        "p95":465,
+        "p95":466,
         "p99":759,
         "min":102,
         "max":2619,
-        "stddev":137.1,
+        "stddev":137.2,
         "streak":2464,
         "streak_hours":205.3,
         "nines":"5+ nines (100%)",
         "bar_24h":"\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588",
-        "sparkline_24h":"\u2585\u2583\u2582 \u2583 \u2586 \u2582\u2586\u2584\u2583\u2583\u2583\u2588\u2582\u2585\u2583 \u2584\u2582 \u2582\u2582",
-        "histogram":"  < 100ms    [                         ]    0 (  0.0%)\n  100-200ms  [\u2588\u2588                       ]  288 ( 11.7%)\n  200-500ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588    ] 2082 ( 84.5%)\n  >= 500ms   [                         ]   94 (  3.8%)",
+        "sparkline_24h":"\u2583\u2582 \u2583 \u2586 \u2582\u2586\u2584\u2583\u2583\u2583\u2588\u2582\u2585\u2583 \u2584\u2582 \u2582\u2582\u2585",
+        "histogram":"  < 100ms    [                         ]    0 (  0.0%)\n  100-200ms  [\u2588\u2588                       ]  288 ( 11.7%)\n  200-500ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588    ] 2081 ( 84.5%)\n  >= 500ms   [                         ]   95 (  3.9%)",
         "sample_count":2464
       }
     },
@@ -105,7 +105,7 @@
       "host":null,
       "port":null,
       "status":"up",
-      "latency_ms":188,
+      "latency_ms":264,
       "message":"HTTP 302",
       "server":"cloudflare",
       "tls":{
@@ -117,7 +117,7 @@
       },
       "host_telemetry":null,
       "heartbeat_age_s":null,
-      "checked_at":"2026-10-21T20:06:11Z",
+      "checked_at":"2026-10-21T20:24:01Z",
       "uptime_24h":100.0,
       "uptime_7d":100.0,
       "uptime_30d":100.0,
@@ -185,7 +185,7 @@
         "streak_hours":205.3,
         "nines":"5+ nines (100%)",
         "bar_24h":"\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588",
-        "sparkline_24h":"\u2582\u2584\u2583\u2582\u2587\u2584\u2583 \u2582\u2583 \u2582 \u2582\u2584 \u2588\u2583\u2583 \u2582   ",
+        "sparkline_24h":"\u2584\u2583\u2582\u2587\u2584\u2583 \u2582\u2583 \u2582 \u2582\u2584 \u2588\u2583\u2583 \u2582   \u2582",
         "histogram":"  < 100ms    [                         ]    6 (  0.2%)\n  100-200ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588               ] 1003 ( 40.7%)\n  200-500ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588           ] 1403 ( 56.9%)\n  >= 500ms   [                         ]   52 (  2.1%)",
         "sample_count":2464
       }
@@ -199,7 +199,7 @@
       "host":null,
       "port":null,
       "status":"up",
-      "latency_ms":236,
+      "latency_ms":199,
       "message":"HTTP 302",
       "server":"cloudflare",
       "tls":{
@@ -211,7 +211,7 @@
       },
       "host_telemetry":null,
       "heartbeat_age_s":null,
-      "checked_at":"2026-10-21T20:06:11Z",
+      "checked_at":"2026-10-21T20:24:01Z",
       "uptime_24h":100.0,
       "uptime_7d":100.0,
       "uptime_30d":100.0,
@@ -279,8 +279,8 @@
         "streak_hours":205.3,
         "nines":"5+ nines (100%)",
         "bar_24h":"\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588",
-        "sparkline_24h":"\u2583  \u2582\u2583\u2582\u2582\u2582\u2583\u2586\u2583\u2582 \u2582\u2585 \u2588\u2583\u2582 \u2582 \u2584\u2582",
-        "histogram":"  < 100ms    [                         ]    7 (  0.3%)\n  100-200ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588               ] 1010 ( 41.0%)\n  200-500ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588           ] 1401 ( 56.9%)\n  >= 500ms   [                         ]   46 (  1.9%)",
+        "sparkline_24h":"  \u2582\u2583\u2582\u2582\u2582\u2583\u2586\u2583\u2582 \u2582\u2585 \u2588\u2583\u2582 \u2582 \u2584\u2582 ",
+        "histogram":"  < 100ms    [                         ]    7 (  0.3%)\n  100-200ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588               ] 1011 ( 41.0%)\n  200-500ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588           ] 1400 ( 56.8%)\n  >= 500ms   [                         ]   46 (  1.9%)",
         "sample_count":2464
       }
     },
@@ -293,7 +293,7 @@
       "host":null,
       "port":null,
       "status":"up",
-      "latency_ms":419,
+      "latency_ms":323,
       "message":"HTTP 200",
       "server":"cloudflare",
       "tls":{
@@ -305,7 +305,7 @@
       },
       "host_telemetry":null,
       "heartbeat_age_s":null,
-      "checked_at":"2026-10-21T20:06:11Z",
+      "checked_at":"2026-10-21T20:24:01Z",
       "uptime_24h":100.0,
       "uptime_7d":100.0,
       "uptime_30d":100.0,
@@ -373,7 +373,7 @@
         "streak_hours":205.3,
         "nines":"5+ nines (100%)",
         "bar_24h":"\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588",
-        "sparkline_24h":"\u2582\u2582  \u2588   \u2582  \u2582 \u2582\u2583\u2582\u2586\u2582\u2584 \u2582 \u2583\u2582",
+        "sparkline_24h":"\u2582  \u2588   \u2582  \u2582 \u2582\u2583\u2582\u2586\u2582\u2584 \u2582 \u2583\u2582 ",
         "histogram":"  < 100ms    [                         ]    0 (  0.0%)\n  100-200ms  [                         ]   69 (  2.8%)\n  200-500ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588   ] 2233 ( 90.6%)\n  >= 500ms   [\u2588                        ]  162 (  6.6%)",
         "sample_count":2464
       }
@@ -387,7 +387,7 @@
       "host":null,
       "port":null,
       "status":"up",
-      "latency_ms":426,
+      "latency_ms":274,
       "message":"HTTP 200",
       "server":"cloudflare",
       "tls":{
@@ -399,7 +399,7 @@
       },
       "host_telemetry":null,
       "heartbeat_age_s":null,
-      "checked_at":"2026-10-21T20:06:11Z",
+      "checked_at":"2026-10-21T20:24:01Z",
       "uptime_24h":100.0,
       "uptime_7d":100.0,
       "uptime_30d":99.96,
@@ -463,11 +463,11 @@
         "min":110,
         "max":7152,
         "stddev":208.8,
-        "streak":2395,
-        "streak_hours":199.6,
+        "streak":2396,
+        "streak_hours":199.7,
         "nines":"3.39 nines (99.96%)",
         "bar_24h":"\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588",
-        "sparkline_24h":"\u2582\u2584\u2582 \u2582\u2583 \u2582\u2582\u2586 \u2582\u2582\u2582\u2584 \u2588\u2584\u2582\u2582\u2582\u2582\u2583\u2583",
+        "sparkline_24h":"\u2584\u2582 \u2582\u2583 \u2582\u2582\u2586 \u2582\u2582\u2582\u2584 \u2588\u2584\u2582\u2582\u2582\u2582\u2583\u2583 ",
         "histogram":"  < 100ms    [                         ]    0 (  0.0%)\n  100-200ms  [\u2588                        ]  169 (  6.9%)\n  200-500ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588   ] 2185 ( 88.7%)\n  >= 500ms   [\u2588                        ]  109 (  4.4%)",
         "sample_count":2464
       }
@@ -481,7 +481,7 @@
       "host":null,
       "port":null,
       "status":"up",
-      "latency_ms":201,
+      "latency_ms":149,
       "message":"HTTP 200",
       "server":"cloudflare",
       "tls":{
@@ -493,7 +493,7 @@
       },
       "host_telemetry":null,
       "heartbeat_age_s":null,
-      "checked_at":"2026-10-21T20:06:11Z",
+      "checked_at":"2026-10-21T20:24:01Z",
       "uptime_24h":100.0,
       "uptime_7d":100.0,
       "uptime_30d":100.0,
@@ -550,19 +550,19 @@
         1
       ],
       "telemetry":{
-        "p50":299,
+        "p50":298,
         "p90":408,
         "p95":471,
         "p99":778,
         "min":113,
         "max":2356,
-        "stddev":125.9,
+        "stddev":126.0,
         "streak":2464,
         "streak_hours":205.3,
         "nines":"5+ nines (100%)",
         "bar_24h":"\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588",
-        "sparkline_24h":" \u2582  \u2582 \u2584  \u2588 \u2582\u2582   \u2584\u2582 \u2582 \u2582  ",
-        "histogram":"  < 100ms    [                         ]    0 (  0.0%)\n  100-200ms  [\u2588\u2588                       ]  287 ( 11.6%)\n  200-500ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588    ] 2076 ( 84.3%)\n  >= 500ms   [\u2588                        ]  101 (  4.1%)",
+        "sparkline_24h":"\u2582\u2582\u2582\u2582\u2582\u2584  \u2588 \u2582\u2582\u2582\u2582\u2582\u2584\u2583 \u2583\u2582\u2582\u2582  ",
+        "histogram":"  < 100ms    [                         ]    0 (  0.0%)\n  100-200ms  [\u2588\u2588                       ]  288 ( 11.7%)\n  200-500ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588    ] 2075 ( 84.2%)\n  >= 500ms   [\u2588                        ]  101 (  4.1%)",
         "sample_count":2464
       }
     },
@@ -575,7 +575,7 @@
       "host":null,
       "port":null,
       "status":"down",
-      "latency_ms":278,
+      "latency_ms":273,
       "message":"HTTP 530",
       "server":"cloudflare",
       "tls":{
@@ -587,10 +587,10 @@
       },
       "host_telemetry":null,
       "heartbeat_age_s":null,
-      "checked_at":"2026-10-21T20:06:11Z",
+      "checked_at":"2026-10-21T20:24:01Z",
       "uptime_24h":0.0,
-      "uptime_7d":16.18,
-      "uptime_30d":77.92,
+      "uptime_7d":15.9,
+      "uptime_30d":77.88,
       "history":[
         0,
         0,
@@ -650,13 +650,13 @@
         "p99":938,
         "min":125,
         "max":3021,
-        "stddev":175.4,
+        "stddev":175.5,
         "streak":0,
         "streak_hours":0.0,
-        "nines":"0.66 nines (77.92%)",
+        "nines":"0.66 nines (77.88%)",
         "bar_24h":"                        ",
         "sparkline_24h":"\u2585\u2585\u2583\u2582  \u2582\u2582\u2582 \u2583\u2583\u2588\u2585\u2582 \u2583 \u2582     ",
-        "histogram":"  < 100ms    [                         ]    0 (  0.0%)\n  100-200ms  [\u2588\u2588                       ]  176 (  9.2%)\n  200-500ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588     ] 1585 ( 82.6%)\n  >= 500ms   [\u2588\u2588                       ]  159 (  8.3%)",
+        "histogram":"  < 100ms    [                         ]    0 (  0.0%)\n  100-200ms  [\u2588\u2588                       ]  176 (  9.2%)\n  200-500ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588     ] 1584 ( 82.5%)\n  >= 500ms   [\u2588\u2588                       ]  159 (  8.3%)",
         "sample_count":2464
       }
     },
@@ -669,7 +669,7 @@
       "host":null,
       "port":null,
       "status":"up",
-      "latency_ms":177,
+      "latency_ms":154,
       "message":"HTTP 200",
       "server":"GitHub.com",
       "tls":{
@@ -681,7 +681,7 @@
       },
       "host_telemetry":null,
       "heartbeat_age_s":null,
-      "checked_at":"2026-10-21T20:06:11Z",
+      "checked_at":"2026-10-21T20:24:01Z",
       "uptime_24h":100.0,
       "uptime_7d":100.0,
       "uptime_30d":100.0,
@@ -739,18 +739,18 @@
       ],
       "telemetry":{
         "p50":206,
-        "p90":317,
+        "p90":316,
         "p95":369,
         "p99":469,
         "min":82,
         "max":3344,
-        "stddev":101.1,
+        "stddev":101.0,
         "streak":2464,
         "streak_hours":205.3,
         "nines":"5+ nines (100%)",
         "bar_24h":"\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588",
-        "sparkline_24h":"\u2584\u2586\u2583\u2584\u2585\u2584\u2583\u2584\u2584  \u2586\u2584\u2585\u2587\u2583\u2587\u2586 \u2584\u2584\u2584\u2588\u2583",
-        "histogram":"  < 100ms    [                         ]   19 (  0.8%)\n  100-200ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588               ] 1057 ( 42.9%)\n  200-500ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588            ] 1367 ( 55.5%)\n  >= 500ms   [                         ]   21 (  0.9%)",
+        "sparkline_24h":"\u2586\u2583\u2584\u2585\u2584\u2583\u2584\u2584  \u2586\u2584\u2585\u2587\u2583\u2587\u2586 \u2584\u2584\u2584\u2588\u2583\u2582",
+        "histogram":"  < 100ms    [                         ]   19 (  0.8%)\n  100-200ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588               ] 1058 ( 42.9%)\n  200-500ms  [\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588            ] 1366 ( 55.4%)\n  >= 500ms   [                         ]   21 (  0.9%)",
         "sample_count":2464
       }
     },
@@ -764,7 +764,7 @@
       "port":null,
       "status":"down",
       "latency_ms":null,
-      "message":"stale heartbeat (507670s ago, max 900s)",
+      "message":"stale heartbeat (508739s ago, max 900s)",
       "server":null,
       "tls":null,
       "host_telemetry":{
@@ -797,11 +797,11 @@
           }
         }
       },
-      "heartbeat_age_s":507670,
-      "checked_at":"2026-10-21T20:06:11Z",
+      "heartbeat_age_s":508739,
+      "checked_at":"2026-10-21T20:24:01Z",
       "uptime_24h":0.0,
-      "uptime_7d":16.33,
-      "uptime_30d":70.37,
+      "uptime_7d":16.05,
+      "uptime_30d":70.33,
       "history":[
         0,
         0,
@@ -864,7 +864,7 @@
         "stddev":null,
         "streak":0,
         "streak_hours":0.0,
-        "nines":"0.53 nines (70.37%)",
+        "nines":"0.53 nines (70.33%)",
         "bar_24h":"                        ",
         "sparkline_24h":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
         "histogram":"  No latency data available.",
@@ -881,17 +881,17 @@
       "port":null,
       "status":"up",
       "latency_ms":null,
-      "message":"last heartbeat 69s ago",
+      "message":"last heartbeat 239s ago",
       "server":null,
       "tls":null,
       "host_telemetry":{
         "os":"Debian Linux (x86_64)",
         "hostname":"taco",
-        "uptime":"2d 2h 2m",
+        "uptime":"2d 2h 17m",
         "load":[
-          2.34,
-          2.98,
-          5.59
+          1.3,
+          1.63,
+          3.17
         ],
         "cpu_count":24,
         "disk":{
@@ -902,14 +902,14 @@
         },
         "mem":{
           "total_gb":62.6,
-          "used_gb":12.0,
-          "free_gb":50.6,
-          "pct":19.2
+          "used_gb":8.3,
+          "free_gb":54.2,
+          "pct":13.3
         },
         "vpn":{}
       },
-      "heartbeat_age_s":69,
-      "checked_at":"2026-10-21T20:06:11Z",
+      "heartbeat_age_s":239,
+      "checked_at":"2026-10-21T20:24:01Z",
       "uptime_24h":100.0,
       "uptime_7d":100.0,
       "uptime_30d":97.48,
@@ -973,7 +973,7 @@
         "min":null,
         "max":null,
         "stddev":null,
-        "streak":1202,
+        "streak":1203,
         "streak_hours":100.2,
         "nines":"1.60 nines (97.48%)",
         "bar_24h":"\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588",
@@ -992,13 +992,13 @@
       "port":null,
       "status":"up",
       "latency_ms":null,
-      "message":"last heartbeat 70s ago",
+      "message":"last heartbeat 239s ago",
       "server":null,
       "tls":null,
       "host_telemetry":{
         "os":"Ubuntu Linux (aarch64)",
         "hostname":"Boba",
-        "uptime":"42d 23h 55m",
+        "uptime":"43d 0h 10m",
         "load":[
           0.0,
           0.0,
@@ -1019,8 +1019,8 @@
         },
         "vpn":{}
       },
-      "heartbeat_age_s":70,
-      "checked_at":"2026-10-21T20:06:11Z",
+      "heartbeat_age_s":239,
+      "checked_at":"2026-10-21T20:24:01Z",
       "uptime_24h":100.0,
       "uptime_7d":100.0,
       "uptime_30d":99.83,
@@ -1084,13 +1084,13 @@
         "min":null,
         "max":null,
         "stddev":null,
-        "streak":1170,
-        "streak_hours":97.5,
+        "streak":1171,
+        "streak_hours":97.6,
         "nines":"2.77 nines (99.83%)",
         "bar_24h":"\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588",
         "sparkline_24h":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
         "histogram":"  No latency data available.",
-        "sample_count":1174
+        "sample_count":1175
       }
     },
     {
@@ -1103,17 +1103,17 @@
       "port":null,
       "status":"up",
       "latency_ms":null,
-      "message":"last heartbeat 70s ago",
+      "message":"last heartbeat 238s ago",
       "server":null,
       "tls":null,
       "host_telemetry":{
         "os":"Debian Linux (x86_64)",
         "hostname":"Pizza",
-        "uptime":"17d 3h 49m",
+        "uptime":"17d 4h 4m",
         "load":[
-          63.37,
-          64.37,
-          67.68
+          52.97,
+          56.05,
+          61.0
         ],
         "cpu_count":64,
         "disk":{
@@ -1125,13 +1125,13 @@
         "mem":{
           "total_gb":125.6,
           "used_gb":25.2,
-          "free_gb":100.5,
+          "free_gb":100.4,
           "pct":20.0
         },
         "vpn":{}
       },
-      "heartbeat_age_s":70,
-      "checked_at":"2026-10-21T20:06:11Z",
+      "heartbeat_age_s":238,
+      "checked_at":"2026-10-21T20:24:01Z",
       "uptime_24h":100.0,
       "uptime_7d":100.0,
       "uptime_30d":99.16,
@@ -1195,13 +1195,13 @@
         "min":null,
         "max":null,
         "stddev":null,
-        "streak":1174,
-        "streak_hours":97.8,
+        "streak":1175,
+        "streak_hours":97.9,
         "nines":"2.07 nines (99.16%)",
         "bar_24h":"\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588",
         "sparkline_24h":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
         "histogram":"  No latency data available.",
-        "sample_count":1184
+        "sample_count":1185
       }
     },
     {
@@ -1214,17 +1214,17 @@
       "port":null,
       "status":"up",
       "latency_ms":null,
-      "message":"last heartbeat 70s ago",
+      "message":"last heartbeat 239s ago",
       "server":null,
       "tls":null,
       "host_telemetry":{
         "os":"Debian Linux (x86_64)",
         "hostname":"Sushi",
-        "uptime":"31d 20h 19m",
+        "uptime":"31d 20h 34m",
         "load":[
-          42.74,
-          51.92,
-          58.73
+          63.11,
+          57.76,
+          56.07
         ],
         "cpu_count":128,
         "disk":{
@@ -1235,14 +1235,14 @@
         },
         "mem":{
           "total_gb":125.6,
-          "used_gb":37.3,
-          "free_gb":88.3,
-          "pct":29.7
+          "used_gb":42.7,
+          "free_gb":83.0,
+          "pct":34.0
         },
         "vpn":{}
       },
-      "heartbeat_age_s":70,
-      "checked_at":"2026-10-21T20:06:11Z",
+      "heartbeat_age_s":239,
+      "checked_at":"2026-10-21T20:24:01Z",
       "uptime_24h":100.0,
       "uptime_7d":100.0,
       "uptime_30d":99.07,
@@ -1306,13 +1306,13 @@
         "min":null,
         "max":null,
         "stddev":null,
-        "streak":1170,
-        "streak_hours":97.5,
+        "streak":1171,
+        "streak_hours":97.6,
         "nines":"2.03 nines (99.07%)",
         "bar_24h":"\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588",
         "sparkline_24h":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
         "histogram":"  No latency data available.",
-        "sample_count":1184
+        "sample_count":1185
       }
     }
   ],
