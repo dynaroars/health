@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      issues: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,6 +49,14 @@ jobs:
 
       - name: Run checks
         run: python scripts/check.py --config config/monitors.yml --data-dir data-branch/data
+
+      # Open/close GitHub issues for problems (see scripts/notify.py). A failure
+      # here must never block updating the dashboard.
+      - name: Open or close alert issues
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/notify.py data-branch/data/status.json
 
       - name: Commit updated history
         working-directory: data-branch

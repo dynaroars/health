@@ -30,6 +30,8 @@ DEFAULT_HEARTBEAT_MAX_AGE = 900  # seconds; 3x a 5-minute push interval
 RETENTION_DAYS_DEFAULT = 30
 BAR_SAMPLES_DEFAULT = 50
 INCIDENT_LIMIT_DEFAULT = 20
+DISK_WARN_PCT = 90
+TLS_WARN_DAYS = 14
 UPTIME_WINDOWS = {"24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400}
 SPARK_CHARS = [" ", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
 
@@ -493,6 +495,8 @@ def build_status(results: list[dict], history: dict, now_ts: int, bar_samples: i
         samples = history["monitors"].get(r["name"], [])
         bar = [s[1] for s in samples[-bar_samples:]]
         telemetry = calc_telemetry(samples, now_ts)
+        incidents = compute_incidents(r["name"], samples, incident_limit)
+        ongoing = incidents and incidents[-1]["end"] is None
 
         monitors_out.append({
             "name": r["name"],
@@ -503,6 +507,7 @@ def build_status(results: list[dict], history: dict, now_ts: int, bar_samples: i
             "host": r.get("host"),
             "port": r.get("port"),
             "status": r["status"],
+            "down_since": iso(incidents[-1]["start"]) if r["status"] == "down" and ongoing else None,
             "latency_ms": r["latency_ms"],
             "message": r["message"],
             "server": r.get("server"),
@@ -516,7 +521,7 @@ def build_status(results: list[dict], history: dict, now_ts: int, bar_samples: i
             "history": bar,
             "telemetry": telemetry,
         })
-        for inc in compute_incidents(r["name"], samples, incident_limit):
+        for inc in incidents:
             all_incidents.append({
                 "monitor": inc["monitor"],
                 "start": iso(inc["start"]),
@@ -560,6 +565,18 @@ def format_duration(minutes: float) -> str:
         h, m = divmod(mins, 60)
         return f"{h} h {m} min" if m else f"{h} h"
     return f"{round(mins / (24 * 60))} days"
+
+
+def monitor_warnings(m: dict) -> list[str]:
+    """Problems worth flagging on a monitor that is still up."""
+    warnings = []
+    disk = (m.get("host_telemetry") or {}).get("disk")
+    if disk and disk.get("pct", 0) >= DISK_WARN_PCT:
+        warnings.append(f"disk {round(disk['pct'])}% full")
+    tls = m.get("tls")
+    if tls and tls.get("days_left") is not None and tls["days_left"] < TLS_WARN_DAYS:
+        warnings.append(f"certificate expires in {tls['days_left']} days")
+    return warnings
 
 
 def format_day(iso: str) -> str:
@@ -627,6 +644,9 @@ def render_html(status: dict) -> str:
             status_str = m["status"]
             if status_str == "up":
                 status_badge = "<span style='color: #859900;'>&#9679;</span> Operational"
+            elif m.get("type") == "heartbeat" and m.get("heartbeat_age_s") is not None:
+                last = format_duration(m["heartbeat_age_s"] / 60)
+                status_badge = f"<strong style='color: #cb4b16;'>&#9679; Offline</strong> (last heartbeat {last} ago)"
             else:
                 status_badge = "<strong style='color: #cb4b16;'>&#9679; Offline</strong>"
 
@@ -651,13 +671,14 @@ def render_html(status: dict) -> str:
             if m_type == "heartbeat":
                 ht = m.get("host_telemetry") or {}
                 load_badge, load_detail = format_load_status(ht.get("load"), ht.get("cpu_count"))
-                extra_metric = load_badge
+                extra_metric = load_badge if status_str == "up" else ""
             elif m.get("latency_ms") is not None:
                 extra_metric = f" <small style='opacity: 0.8; font-weight: normal;'>({m['latency_ms']}ms)</small>"
 
+            warn_html = "".join(f" &middot; <strong style='color: #b58900;'>{w}</strong>" for w in monitor_warnings(m))
             summary_line = (
                 f"<strong>{name_html}</strong>{desc_badge}<br>"
-                f"{status_badge}{extra_metric} &middot; <span style=\"font-family: monospace;\">[24h ago {bar_24h} now] {u24_val}</span>"
+                f"{status_badge}{extra_metric} &middot; <span style=\"font-family: monospace;\">[24h ago {bar_24h} now] {u24_val}</span>{warn_html}"
             )
 
             if m["type"] == "heartbeat":
