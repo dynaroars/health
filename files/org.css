@@ -60,44 +60,7 @@ details > summary {
   border: 2px dotted transparent;
 }
 
-/* Status page monitor rows: label on the left, stats on the right; when the
-   window is too narrow for both, the stats wrap to their own line as a unit. */
-details.monitor {
-  margin-bottom: 1em;
-}
-
-details.monitor > summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 1em;
-  padding: 4px 0;
-  list-style: none;
-}
-
-details.monitor > summary::-webkit-details-marker {
-  display: none;
-}
-
-details.monitor > summary .monitor-label::before {
-  content: "▸ ";
-}
-
-details.monitor[open] > summary .monitor-label::before {
-  content: "▾ ";
-}
-
-.monitor-label {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.health-stats {
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-details.monitor pre {
+pre {
   overflow-x: auto;
 }
 
@@ -112,11 +75,6 @@ details.monitor pre {
 
   header {
     padding-right: 45vw;
-  }
-
-  .health-stats {
-    margin-left: 0;
-    white-space: normal;
   }
 }
 
