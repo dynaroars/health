@@ -552,6 +552,21 @@ def atomic_write_json(path: str, data) -> None:
 # Pure HTML + org.css Renderer (Zero JavaScript)
 # --------------------------------------------------------------------------
 
+def format_duration(minutes: float) -> str:
+    mins = max(1, round(minutes))
+    if mins < 60:
+        return f"{mins} min"
+    if mins < 48 * 60:
+        h, m = divmod(mins, 60)
+        return f"{h} h {m} min" if m else f"{h} h"
+    return f"{round(mins / (24 * 60))} days"
+
+
+def format_day(iso: str) -> str:
+    dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    return f"{dt:%b} {dt.day}"
+
+
 def make_bar(pct: float, width: int = 20) -> str:
     filled = max(0, min(width, int(round((pct / 100.0) * width))))
     return "█" * filled + "░" * (width - filled)
@@ -591,11 +606,11 @@ def render_html(status: dict) -> str:
     overall = status.get("overall", "operational")
 
     if overall == "operational":
-        overall_msg = "🟢 <strong>All systems operational</strong>"
+        overall_msg = "<span style='color: #859900;'>&#9679;</span> <strong>All systems operational</strong>"
     elif overall == "outage":
-        overall_msg = "🔴 <strong>Major outage</strong> &mdash; all monitored services are down"
+        overall_msg = "<span style='color: #cb4b16;'>&#9679;</span> <strong>Major outage</strong> &mdash; all monitored services are down"
     else:
-        overall_msg = "🟡 <strong>Degraded performance / partial outage</strong>"
+        overall_msg = "<span style='color: #b58900;'>&#9679;</span> <strong>Degraded performance / partial outage</strong>"
 
     groups: dict[str, list[dict]] = {}
     for m in monitors:
@@ -611,22 +626,16 @@ def render_html(status: dict) -> str:
         for m in gmonitors:
             status_str = m["status"]
             if status_str == "up":
-                status_badge = "<span>🟢 Operational</span>"
+                status_badge = "<span style='color: #859900;'>&#9679;</span> Operational"
             else:
-                status_badge = "<strong style='color: #cb4b16;'>🔴 Offline</strong>"
+                status_badge = "<strong style='color: #cb4b16;'>&#9679; Offline</strong>"
 
             m_type = m.get("type", "http")
-            if m_type == "heartbeat":
-                type_icon = "🖥️"
-            elif m_type == "tcp":
-                type_icon = "🔌"
-            else:
-                type_icon = "🌐"
 
             if m.get("url"):
-                name_html = f'{type_icon} <a href="{m["url"]}">{m["name"]}</a>'
+                name_html = f'<a href="{m["url"]}">{m["name"]}</a>'
             else:
-                name_html = f'{type_icon} {m["name"]}'
+                name_html = m["name"]
 
             desc_str = m.get("description", "")
             desc_badge = f'<span style="font-weight: normal; opacity: 0.8; font-size: 0.9em;"> &mdash; {desc_str}</span>' if desc_str else ""
@@ -648,7 +657,7 @@ def render_html(status: dict) -> str:
 
             summary_line = (
                 f"<strong>{name_html}</strong>{desc_badge}<br>"
-                f"{status_badge}{extra_metric} &middot; <code>[24h ago {bar_24h} now] {u24_val}</code>"
+                f"{status_badge}{extra_metric} &middot; <span style=\"font-family: monospace;\">[24h ago {bar_24h} now] {u24_val}</span>"
             )
 
             if m["type"] == "heartbeat":
@@ -765,13 +774,13 @@ TLS Details:                   {tls_info_str}
         for inc in incidents:
             ongoing = inc.get("end") is None
             if ongoing:
-                time_str = f"since {inc['start']} (ongoing)"
+                time_str = f"down since {format_day(inc['start'])} (ongoing)"
             else:
-                time_str = f"{inc['start']} &ndash; {inc['end']} ({inc['duration_min']} min)"
+                time_str = f"down {format_duration(inc['duration_min'])} &middot; {format_day(inc['start'])}"
             inc_items.append(f"    <li><strong>{inc['monitor']}</strong> &mdash; {time_str}</li>")
         incidents_list = "\n".join(inc_items)
         incidents_html = f"""
-  <h2>⚠️ Recent Incidents</h2>
+  <h2>Recent Incidents</h2>
   <ul>
 {incidents_list}
   </ul>
