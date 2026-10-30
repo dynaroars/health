@@ -647,7 +647,7 @@ def render_html(status: dict) -> str:
                 extra_metric = f" <small style='opacity: 0.8; font-weight: normal;'>({m['latency_ms']}ms)</small>"
 
             summary_line = (
-                f"<strong>{name_html}</strong>{desc_badge}"
+                f"<span class=\"monitor-label\"><strong>{name_html}</strong>{desc_badge}</span>"
                 f"<span class=\"health-stats\">{status_badge}{extra_metric} &middot; <code>[24h ago {bar_24h} now] {u24_val}</code></span>"
             )
 
@@ -686,8 +686,8 @@ def render_html(status: dict) -> str:
                 disk_val = f"{ht['disk']['used_gb']} GB / {ht['disk']['total_gb']} GB [{make_bar(ht['disk']['pct'])}] {ht['disk']['pct']}%" if ht.get("disk") else "N/A"
 
                 group_cards.append(f"""
-  <details class="myborder" style="margin-bottom: 1em;">
-    <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
+  <details class="myborder monitor">
+    <summary>{summary_line}</summary>
     <pre><code>=== 🖥️ Host & Platform Information ===
 Description:     {desc_str or 'n/a'}
 Hostname:        {hostname_val}
@@ -724,8 +724,8 @@ Heartbeats Logged:             {t.get('sample_count', 0)} samples</code></pre>
                 current_lat = f"{m['latency_ms']} ms" if m.get("latency_ms") is not None else "--"
 
                 group_cards.append(f"""
-  <details class="myborder" style="margin-bottom: 1em;">
-    <summary style="cursor: pointer; padding: 4px 0;">{summary_line}</summary>
+  <details class="myborder monitor">
+    <summary>{summary_line}</summary>
     <pre><code>=== 📊 SRE & Availability ===
 24h History (24h ago ──► now): [{bar_24h}] ({u24_val} operational)
 Availability (30d):            {t.get('nines', 'n/a')}
