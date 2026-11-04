@@ -24,10 +24,10 @@ jobs:
       issues: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -69,12 +69,17 @@ jobs:
           git commit -m "update status $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           # Machines pushing heartbeats (scripts/heartbeat.py) can land commits
           # on this branch between our fetch and our push, so retry with a
-          # rebase instead of failing on a non-fast-forward push.
-          for attempt in 1 2 3; do
+          # rebase instead of failing on a non-fast-forward push. All machines'
+          # crons fire on the same 5-minute boundary, so heartbeats arrive in a
+          # burst of a few seconds; back off with jitter to let it pass rather
+          # than retrying immediately into the same burst.
+          for attempt in 1 2 3 4 5 6; do
             if git push origin data; then
               exit 0
             fi
-            echo "push rejected, rebasing onto latest data (attempt $attempt)"
+            delay=$(( attempt * 3 + RANDOM % 5 ))
+            echo "push rejected, retrying in ${delay}s after rebasing onto latest data (attempt $attempt)"
+            sleep "$delay"
             git fetch origin data
             git rebase origin/data
           done
@@ -88,7 +93,7 @@ jobs:
           cp files/org.css _site/files/
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
@@ -104,4 +109,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
